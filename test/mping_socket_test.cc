@@ -52,6 +52,7 @@ TEST(MpingSocket, IPv6UDPwithSrc) {
   MpingSocket test2sock("::1", "2620:0:1000:3202:6e3b:e5ff:fe0b:5ca3",
                         14, 1024, 1, 0);
   test2sock.SendPacket(8, 1024);
+
   EXPECT_EQ(8u, test2sock.ReceiveAndGetSeq(1024));
 }
 
