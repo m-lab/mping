@@ -7,18 +7,18 @@
 #include <errno.h>
 #include <string.h>
 
-#include "scoped_ptr.h"
 #include "log.h"
 #include "mp_socket.h"
 #include "mlab/mlab.h"
 #include "mlab/protocol_header.h"
+#include "scoped_ptr.h"
 
 namespace {
 
-const int mp_default_ttl = 128;
+const int kMPDefaultTTL = 128;
 
-const char *payload_header = "mlab-seq#";
-const int payload_header_length = 9;
+const char *kPayloadHeader = "mlab-seq#";
+const int kPayloadHeaderLength = 9;
 
 int AddressFamilyFor(SocketFamily family) {
   switch (family) {
@@ -31,8 +31,8 @@ int AddressFamilyFor(SocketFamily family) {
 
 }  // namespace
 
-MpingSocket::MpingSocket(const std::string destip, const std::string srcip,
-                             int ttl, size_t pktsize, int wndsize, uint16_t port) {
+MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
+                         int ttl, size_t pktsize, int wndsize, uint16_t port) {
   family_ = mlab::RawSocket::GetAddrFamily(destip);
 
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
@@ -83,30 +83,34 @@ MpingSocket::MpingSocket(const std::string destip, const std::string srcip,
       case SOCKETFAMILY_IPV4: {
         scoped_ptr<mlab::ICMP4Header> icmphdr(new mlab::ICMP4Header(ICMP_ECHO, 
                                                                     0, 0, 0));
+        // TODO: add get buffer method to protocol headers
         memcpy(buffer_, icmphdr.get(), sizeof(mlab::ICMP4Header));
-        memcpy(buffer_ + sizeof(mlab::ICMP4Header), payload_header,
-               payload_header_length);
-        buffer_length_ = sizeof(mlab::ICMP4Header) + payload_header_length;
+        memcpy(buffer_ + sizeof(mlab::ICMP4Header), kPayloadHeader,
+               kPayloadHeaderLength);
+        buffer_length_ = sizeof(mlab::ICMP4Header) + kPayloadHeaderLength;
         break;
       }
       case SOCKETFAMILY_IPV6: {
         scoped_ptr<mlab::ICMP6Header> icmp6hdr(new mlab::ICMP6Header(128, 0,
                                                                      0, 0));
         memcpy(buffer_, icmp6hdr.get(), sizeof(mlab::ICMP6Header));
-        memcpy(buffer_ + sizeof(mlab::ICMP6Header), payload_header, 
-               payload_header_length);
-        buffer_length_ = sizeof(mlab::ICMP6Header) + payload_header_length;
+        memcpy(buffer_ + sizeof(mlab::ICMP6Header), kPayloadHeader, 
+               kPayloadHeaderLength);
+        buffer_length_ = sizeof(mlab::ICMP6Header) + kPayloadHeaderLength;
         break;
       }
-      case SOCKETFAMILY_UNSPEC: break;  // won't come here
+      case SOCKETFAMILY_UNSPEC: 
+        LOG(mlab::FATAL, "Unknown socket family.");
     }
 
     // validate buffer size
     if (icmp_sock->GetRecvBufferSize() < (pktsize * wndsize)) {
+      LOG(mlab::WARNING, "Change recv buffer size.");
       icmp_sock->SetRecvBufferSize(pktsize * wndsize);
     }
       
     if (icmp_sock->GetSendBufferSize() < pktsize) {
+      LOG(mlab::WARNING, "Change send buffer size.");
       icmp_sock->SetSendBufferSize(pktsize);
     }
   } else {  // UDP socket to send
@@ -116,7 +120,7 @@ MpingSocket::MpingSocket(const std::string destip, const std::string srcip,
     if (port > 0) { 
       dport = port;
     } else {
-      dport = (getpid() & 0xffff) | 0x8000;  // random port > 32768
+      dport = 32768 + (rand() % 32768);  // random port > 32768
     }
 
     udp_sock = mlab::ClientSocket::CreateOrDie(mlab::Host(destip), dport,
@@ -178,8 +182,8 @@ MpingSocket::MpingSocket(const std::string destip, const std::string srcip,
     // icmp_sock->Connect(mlab::Host(destip));
 
     // build packet
-    memcpy(buffer_, payload_header, payload_header_length);
-    buffer_length_ = payload_header_length;
+    memcpy(buffer_, kPayloadHeader, kPayloadHeaderLength);
+    buffer_length_ = kPayloadHeaderLength;
 
     // validate socket buffer size
     if (icmp_sock->GetRecvBufferSize() < (pktsize * wndsize)) {
@@ -196,32 +200,19 @@ bool MpingSocket::SetSendTTL(const int& ttl) {
   if (!use_udp_) {
     LOG(mlab::ERROR, "Not using UDP, no need to set TTL.");
     return false;
-  } else {
-    ASSERT(udp_sock != NULL);
-    return udp_sock->SetTTL(ttl);
-  }
-}
+  } 
 
-MpingSocket::MpingSocket(const MpingSocket& other) { 
-  LOG(mlab::FATAL, "MpingSocket no copy.");
+  ASSERT(udp_sock != NULL);
+  return udp_sock->SetTTL(ttl);
+  
 }
-
-MpingSocket& MpingSocket::operator= (const MpingSocket&) {
-  LOG(mlab::FATAL, "MpingSocket no copy.");
-  return *this;
-}
-
 
 MpingSocket::~MpingSocket() {
-  if (icmp_sock != NULL) {
-    delete icmp_sock;
-    icmp_sock = NULL;
-  }
+  delete icmp_sock;
+  icmp_sock = NULL;
 
-  if (udp_sock != NULL) {
-    delete udp_sock;
-    udp_sock = NULL;
-  }
+  delete udp_sock;
+  udp_sock = NULL;
 }
 
 size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size, int *error) const {
@@ -259,6 +250,7 @@ size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size, int *error)
   seq_ptr = reinterpret_cast<unsigned int*>(buf + buffer_length_);
   *seq_ptr = htonl(seq);
   
+  // TODO: use protocol enum so that adding TCP is trivial
   if (!use_udp_) {  // ICMP
     ASSERT(icmp_sock != NULL);
     if (family_ == SOCKETFAMILY_IPV4) {
@@ -302,22 +294,25 @@ unsigned int MpingSocket::ReceiveAndGetSeq(size_t size, int* error) {
             ptr += sizeof(mlab::IP4Header);
 
             icmp_ptr = reinterpret_cast<const mlab::ICMP4Header *>(ptr);
-            //LOG(mlab::INFO, "done check size");
+
             if (icmp_ptr->icmp_type == ICMP_ECHOREPLY) {
               ptr += sizeof(mlab::ICMP4Header);
 
-              //LOG(mlab::INFO, "done check message type");
-              std::string head(ptr, payload_header_length);  // check payload
-              if (head.compare(payload_header) == 0) {
-                //LOG(mlab::INFO, "done check message header");
+              std::string head(ptr, kPayloadHeaderLength);  // check payload
+              if (head.compare(kPayloadHeader) == 0) {
                 const unsigned int *seq = 
                     reinterpret_cast<const unsigned int*>(
-                        ptr+ payload_header_length);
-                //LOG(mlab::INFO, "seq is %u", ntohl(*seq));
+                        ptr+ kPayloadHeaderLength);
                 *error = err;
                 return ntohl(*seq);
+              } else {
+                LOG(mlab::VERBOSE, "recv an echoreply not belonging to us");
               }
-            } 
+            } else {
+              LOG(mlab::VERBOSE, "recv a non-echoreply packet.");
+            }
+          } else {
+            LOG(mlab::VERBOSE, "recv packet is too small.");
           }
         }
         break;
@@ -342,15 +337,21 @@ unsigned int MpingSocket::ReceiveAndGetSeq(size_t size, int* error) {
             icmp_ptr = reinterpret_cast<const mlab::ICMP6Header *>(ptr);
             if (icmp_ptr->icmp6_type == 129) {  // ICMP6_ECHO_REPLY
               ptr += sizeof(mlab::ICMP6Header);
-              std::string head(ptr, payload_header_length);
-              if (head.compare(payload_header) == 0) {
+              std::string head(ptr, kPayloadHeaderLength);
+              if (head.compare(kPayloadHeader) == 0) {
                 const unsigned int *seq =
                     reinterpret_cast<const unsigned int*>(ptr+
-                                                         payload_header_length);
+                                                         kPayloadHeaderLength);
                 *error = err;
                 return ntohl(*seq);
+              } else {
+                LOG(mlab::VERBOSE, "recv an echoreply not belonging to us");
               }
+            } else {
+              LOG(mlab::VERBOSE, "recv a non-echoreply packet.");
             }
+          } else {
+            LOG(mlab::VERBOSE, "recv packet is too small.");
           }
         }
         break;
@@ -391,17 +392,25 @@ unsigned int MpingSocket::ReceiveAndGetSeq(size_t size, int* error) {
               ip_ptr = reinterpret_cast<const mlab::IP4Header *>(ptr);
               if (ip_ptr->protocol == IPPROTO_UDP) {
                 ptr += (sizeof(mlab::IP4Header) + sizeof(mlab::UDPHeader));
-                std::string head(ptr, payload_header_length);
-                if (head.compare(payload_header) == 0) {
+                std::string head(ptr, kPayloadHeaderLength);
+                if (head.compare(kPayloadHeader) == 0) {
                   fromaddr_ = fromip.original_hostname;
                   const unsigned int *seq =
                       reinterpret_cast<const unsigned int*>(ptr+
-                                                         payload_header_length);
+                                                         kPayloadHeaderLength);
                   *error = err;
                   return ntohl(*seq);
+                } else {
+                  LOG(mlab::VERBOSE, "recv an ICMP bot belonging to us");
                 }
+              } else {
+                LOG(mlab::VERBOSE, "not an ICMP for UDP");
               }
+            } else {
+              LOG(mlab::VERBOSE, "recv an ICMP message with wrong type");
             }
+          } else {
+            LOG(mlab::VERBOSE, "recv packet is too small.");
           }
         }
         break;
@@ -433,17 +442,25 @@ unsigned int MpingSocket::ReceiveAndGetSeq(size_t size, int* error) {
               ip_ptr = reinterpret_cast<const mlab::IP6Header *>(ptr);
               if (ip_ptr->next_header == IPPROTO_UDP) {
                 ptr += (sizeof(mlab::IP6Header) + sizeof(mlab::UDPHeader));
-                std::string head(ptr, payload_header_length);
-                if (head.compare(payload_header) == 0) {
+                std::string head(ptr, kPayloadHeaderLength);
+                if (head.compare(kPayloadHeader) == 0) {
                   fromaddr_ = fromip.original_hostname;
                   const unsigned int *seq =
                       reinterpret_cast<const unsigned int*>(ptr+
-                                                         payload_header_length);
+                                                         kPayloadHeaderLength);
                   *error = err;
                   return ntohl(*seq);
+                } else {
+                  LOG(mlab::VERBOSE, "recv an ICMP bot belonging to us");
                 }
+              } else {
+                LOG(mlab::VERBOSE, "not an ICMP for UDP");
               }
+            } else {
+              LOG(mlab::VERBOSE, "recv an ICMP message with wrong type");
             }
+          } else {
+            LOG(mlab::VERBOSE, "recv packet is too small.");
           }
         }
         break;
