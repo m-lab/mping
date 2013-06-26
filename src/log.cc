@@ -16,7 +16,7 @@
 
 #include <stdio.h>
 
-namespace mlab {
+namespace mlab{
 namespace {
 #if defined(DEBUG)
   LogSeverity min_severity = VERBOSE;
@@ -43,7 +43,7 @@ FILE* GetSeverityFD(LogSeverity s) {
   return NULL;
 }
 
-const char* GetSeverityTag(LogSeverity s) {
+const char* GetSeverityTag(mlab::LogSeverity s) {
   switch (s) {
     case VERBOSE: return "V";
     case INFO: return "I";
@@ -53,5 +53,4 @@ const char* GetSeverityTag(LogSeverity s) {
   }
   return "";
 }
-
 }  // namespace mlab

@@ -1,6 +1,9 @@
 #include <climits>
 #include <iostream>
+#include <iomanip>
+
 #include "mlab/mlab.h"
+#include "mp_mping.h"
 #include "mp_stats.h"
 #include "log.h"
 
@@ -43,12 +46,14 @@ void MpingStat::EnqueueSend(unsigned int seq,
     send_queue.at(idx) = TempNode;
   }
   
+#ifdef MP_PRINT_TIMELINE
   // timeline
-//  if (seq > INT_MAX) {
-//    LOG(mlab::FATAL, "send sequence number is too large.");
-//  } else {
-//    timeline.push_back((int)seq);
-//  }
+  if (seq > INT_MAX) {
+    LOG(mlab::FATAL, "send sequence number is too large.");
+  } else {
+    timeline.push_back((int)seq);
+  }
+#endif
 }
 
 void MpingStat::EnqueueRecv(unsigned int seq, 
@@ -80,12 +85,28 @@ void MpingStat::EnqueueRecv(unsigned int seq,
   recv_num_temp_++;
 
   // timeline
-//  if (seq > INT_MAX) {
-//    LOG(mlab::FATAL, "recv sequence number is too large.");
-//  } else {
-//    int s = (int)seq;
-//    timeline.push_back(0 - s);
-//  }
+#ifdef MP_PRINT_TIMELINE
+  if (seq > INT_MAX) {
+    LOG(mlab::FATAL, "recv sequence number is too large.");
+  } else {
+    int s = (int)seq;
+    timeline.push_back(0 - s);
+  }
+#endif
+}
+
+void MpingStat::PrintTimeLine() const {
+  unsigned int idx = 0;
+  while (idx<timeline.size()) {
+    if (timeline.at(idx) > 0)
+      std::cout << std::setw(5) << timeline.at(idx) 
+                << " --> " << std::endl;
+    else
+      std::cout << "      <-- " << std::setw(5) << 
+                   timeline.at(idx) << std::endl;
+
+    idx++;
+  }
 }
 
 void MpingStat::PrintTempStats() {

@@ -40,10 +40,11 @@ namespace {
       <host>     Target host\n";
 
 const size_t kMaxBuffer = 9000;  // > 2 FDDI?
-const int kNbTab[] = {28, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
+const int kNbTab[] = {50, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
 
 int haltf;
 int tick;
+bool timedout;
 
 void ring(int signo) {
   struct sigaction sa, osa;
@@ -53,6 +54,7 @@ void ring(int signo) {
   if (sigaction(SIGALRM, &sa, &osa) < 0) {
     LOG(mlab::FATAL, "sigaction SIGALRM. %s [%d]", strerror(errno), errno);
   }
+  timedout = true;
   tick = 0;
 }
 
@@ -112,6 +114,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
   unsigned int sseq = 0;  // send sequence
   unsigned int mrseq = 0;  // recv sequence
   bool start_burst = false;  // set true when win_size > burst size
+  timedout = true;
 
   maxsize = std::max(pkt_size, kMaxBuffer);
 
@@ -175,7 +178,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
       // 0 is to collect all trailing messages still in transit
       uint16_t intran;  // current window size
       for (intran = loop?win_size:1; intran; intran?intran++:0) {
-        bool mustsend;
+        int mustsend;
         struct timeval now;
 
         if (haltf)
@@ -191,8 +194,11 @@ int MPing::GoProbing(const std::string& dst_addr) {
             intran = 0;
           }
         }
-        if (intran)
-          mustsend = true;
+
+        if (intran > 0 && timedout) {
+          mustsend = 1;
+          timedout = false;
+        }
 
         // printing
         if (!loop || inc_ttl > 0 || loop_size < 0) {
@@ -220,6 +226,10 @@ int MPing::GoProbing(const std::string& dst_addr) {
         
         // fourth loop: with in 1 sec
         tick++;
+
+#ifdef MP_PRINT_TIMELINE
+        int out = 0;  // for debug
+#endif        
         while (tick >= now.tv_sec) {
           int maxopen;
           int rt;
@@ -265,6 +275,9 @@ int MPing::GoProbing(const std::string& dst_addr) {
             } else {  // send success, update counters
               gettimeofday(&now, 0);
               mystat->EnqueueSend(sseq, now);
+#ifdef MP_PRINT_TIMELINE              
+              out++;
+#endif              
               
               if (burst > 0 && intran >= burst && 
                   !start_burst && (sseq-mrseq-intran) == 0) {
@@ -301,10 +314,15 @@ int MPing::GoProbing(const std::string& dst_addr) {
               mrseq = rseq;
             }
           }
+#ifdef MP_PRINT_TIMELINE          
+          if (out >= 50) {
+            break;
+          }
+#endif
           gettimeofday(&now, 0);
         }  // end of fourth loop: time tick
 
-        mystat->PrintTempStats();
+ //       mystat->PrintTempStats();
       }  // end of third loop: window size
     }  // end of second loop: buffer size
 
@@ -315,7 +333,11 @@ int MPing::GoProbing(const std::string& dst_addr) {
     if (haltf == 1) haltf = 0;
   }  // end of first loop: ttl
 
+#ifndef MP_PRINT_TIMELINE
   mystat->PrintStats();
+#else
+  mystat->PrintTimeLine();
+#endif
 
   return 0;
 }

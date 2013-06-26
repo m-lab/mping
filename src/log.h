@@ -23,16 +23,16 @@
 
 namespace mlab {
 
-FILE* GetSeverityFD(LogSeverity s);
-const char* GetSeverityTag(LogSeverity s);
+FILE* GetSeverityFD(mlab::LogSeverity s);
+const char* GetSeverityTag(mlab::LogSeverity s);
 
 }  // namespace mlab
 
 #define ASSERT(predicate) if (!(predicate)) raise(SIGABRT)
 
 #define LOG(severity, format, ...) { \
-    if (FILE* fd = mlab::GetSeverityFD(severity)) { \
-      fprintf(fd, "[%s] %s|%d: ", mlab::GetSeverityTag(severity), \
+    if (FILE* fd = GetSeverityFD(severity)) { \
+      fprintf(fd, "[%s] %s|%d: ", GetSeverityTag(severity), \
               __FILE__, __LINE__); \
       fprintf(fd, format, ##__VA_ARGS__); \
       fprintf(fd, "\n"); \

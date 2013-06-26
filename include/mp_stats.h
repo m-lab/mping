@@ -53,6 +53,7 @@ class MpingStat {
 
     void PrintStats() const;
     void PrintTempStats();
+    void PrintTimeLine() const;
 
   protected:
     unsigned int unexpect_num_;
