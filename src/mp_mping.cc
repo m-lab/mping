@@ -322,7 +322,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
           gettimeofday(&now, 0);
         }  // end of fourth loop: time tick
 
- //       mystat->PrintTempStats();
+        mystat->PrintTempStats();
       }  // end of third loop: window size
     }  // end of second loop: buffer size
 
