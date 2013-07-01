@@ -50,6 +50,7 @@ class MpingStat {
 
     void EnqueueSend(unsigned int seq, struct timeval time);
     void EnqueueRecv(unsigned int seq, struct timeval time); 
+    void LogUnexpected();
 
     void PrintStats() const;
     void PrintTempStats();

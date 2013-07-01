@@ -15,6 +15,7 @@
 #include "mlab/socket_family.h"
 #include "mlab/host.h"
 #include "mlab/mlab.h"
+#include "mlab/protocol_header.h"
 #include "mlab/raw_socket.h"
 
 namespace {
@@ -34,13 +35,14 @@ namespace {
       -B <bnum>   Send <bnum> packets in burst, should smaller than <num>\n\
       -p <port>   If UDP, destination port number\n\
 \n\
-      -V, -d  Version, Debug\n\
+      -V, -d  Version, Debug (verbose)\n\
 \n\
       -F <addr>   Select a source interface\n\
       <host>     Target host\n";
 
 const size_t kMaxBuffer = 9000;  // > 2 FDDI?
-const int kNbTab[] = {50, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
+const int kNbTab[] = {64, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
+const char *kVersion = "mping version: 2.0 (2013.06)";
 
 int haltf;
 int tick;
@@ -99,12 +101,14 @@ void MPing::Run() {
 
   for (std::set<std::string>::iterator it = dest_ips.begin();
        it != dest_ips.end(); ++it) {
-    // LOG(mlab::INFO, "%s", it->c_str());
+    LOG(mlab::INFO, "destination IP: %s", it->c_str());
 
-    if (GoProbing(*it) < 0)
+    if (GoProbing(*it) < 0) {
+      LOG(mlab::INFO, "detination IP %s fails, try next.", it->c_str());
       continue;  // The current destination address is not responding
-    else
+    } else {
       break;
+    }
   }
 }
 
@@ -118,8 +122,10 @@ int MPing::GoProbing(const std::string& dst_addr) {
 
   maxsize = std::max(pkt_size, kMaxBuffer);
 
+  try {
   scoped_ptr<MpingSocket> mysock(new MpingSocket(dst_addr, src_addr, ttl, 
                                                maxsize, win_size, dport));
+
   scoped_ptr<MpingStat> mystat(new MpingStat(win_size));
 
   int tempttl = 1;
@@ -296,7 +302,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
           }
           
           // recv
-          rseq = mysock->ReceiveAndGetSeq(packet_size, &err);
+          rseq = mysock->ReceiveAndGetSeq(packet_size, &err, mystat.get());
           if (err != 0) {
             //if (err == EINTR)
              // continue;
@@ -307,8 +313,8 @@ int MPing::GoProbing(const std::string& dst_addr) {
             gettimeofday(&now, 0);
             mystat->EnqueueRecv(rseq, now);
 
-            if ((int)(rseq - mrseq) < 0 || (int)(sseq - rseq) < 0) {
-              LOG(mlab::ERROR, "out-of-order packet or unknown bug %d %d %d",
+            if ((int)(sseq - rseq) < 0) {
+              LOG(mlab::ERROR, "recv a seq larger than sent %d %d %d",
                   mrseq, rseq, sseq);
             } else {
               mrseq = rseq;
@@ -333,11 +339,15 @@ int MPing::GoProbing(const std::string& dst_addr) {
     if (haltf == 1) haltf = 0;
   }  // end of first loop: ttl
 
-#ifndef MP_PRINT_TIMELINE
   mystat->PrintStats();
-#else
+
+#ifdef MP_PRINT_TIMELINE
   mystat->PrintTimeLine();
 #endif
+
+  } catch (int e) {
+    return -1;
+  }
 
   return 0;
 }
@@ -432,6 +442,17 @@ MPing::MPing(const int& argc, const char **argv) :
 }
 
 void MPing::ValidatePara() {
+
+  // print version
+  if (version) {
+    std::cout << kVersion << std::endl;
+    exit(0);
+  }
+
+  if (debug) {
+    mlab::SetLogSeverity(mlab::VERBOSE);
+  }
+
   // destination set?
   if (dst_host.empty()) {
     LOG(mlab::FATAL, "Must have destination host. \n%s", usage);

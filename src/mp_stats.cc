@@ -95,6 +95,11 @@ void MpingStat::EnqueueRecv(unsigned int seq,
 #endif
 }
 
+void MpingStat::LogUnexpected() {
+  unexpect_num_++;
+  unexpect_num_temp_++;
+}
+
 void MpingStat::PrintTimeLine() const {
   unsigned int idx = 0;
   while (idx<timeline.size()) {

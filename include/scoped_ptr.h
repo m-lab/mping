@@ -24,6 +24,7 @@ class scoped_ptr {
   T* operator->() { return ptr_; }
   const T* operator->() const { return ptr_; }
 
+  T* get() { return ptr_; }
   const T* get() const { return ptr_; }
 
  private:

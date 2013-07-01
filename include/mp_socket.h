@@ -18,6 +18,7 @@
 #include "mlab/client_socket.h"
 #include "mlab/socket_family.h"
 #include "mlab/raw_socket.h"
+#include "mp_stats.h"
 #include "log.h"
 
 class MpingSocket {
@@ -28,7 +29,7 @@ class MpingSocket {
 
     bool SetSendTTL(const int& ttl);
     size_t SendPacket(const unsigned int& seq, size_t size, int *error) const;
-    unsigned int ReceiveAndGetSeq(size_t size, int* error);
+    unsigned int ReceiveAndGetSeq(size_t size, int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
 
   protected:
