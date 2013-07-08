@@ -24,11 +24,11 @@
 
 class MPing{
   public:
-
     MPing(const int& argc, const char **argv); 
     void Run();
-
-        
+    void RunServer();
+    bool IsServerMode() const;
+ 
   private:
     int        win_size;  
     bool       loop;
@@ -43,6 +43,9 @@ class MPing{
     int        burst;  // burst size
     int        interval;  // undefined now
     int        dport;
+    unsigned short  server_port;
+    SocketFamily server_family;
+    bool       client_mode;
     std::string src_addr;
     std::string dst_host;
     std::set<std::string> dest_ips;

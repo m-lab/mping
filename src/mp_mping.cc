@@ -16,7 +16,7 @@
 #include "mlab/host.h"
 #include "mlab/mlab.h"
 #include "mlab/protocol_header.h"
-#include "mlab/raw_socket.h"
+#include "mlab/server_socket.h"
 
 namespace {
   char usage[] = 
@@ -35,6 +35,11 @@ namespace {
       -B <bnum>   Send <bnum> packets in burst, should smaller than <num>\n\
       -p <port>   If UDP, destination port number\n\
 \n\
+      -s <sport>  Server mode, liten on UDP <sport>\n\
+      -4          Server mode, use IPv4\n\
+      -6          Server mode, use IPv6\n\
+      -c          Client mode, sending with UDP to a server running -s\n\
+\n\
       -V, -d  Version, Debug (verbose)\n\
 \n\
       -F <addr>   Select a source interface\n\
@@ -43,6 +48,7 @@ namespace {
 const size_t kMaxBuffer = 9000;  // > 2 FDDI?
 const int kNbTab[] = {64, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
 const char *kVersion = "mping version: 2.0 (2013.06)";
+const int kDefaultTTL = 255;
 
 int haltf;
 int tick;
@@ -112,6 +118,96 @@ void MPing::Run() {
   }
 }
 
+void MPing::RunServer() {
+  bool have_data = false;
+  size_t packet_size = std::max(kMaxBuffer, pkt_size);
+  const char *PayloadHeader = "mlab-seq#";
+  const int PayloadHeaderLength = 9;
+
+  int unexpected = 0;
+  int seq_recv = 0;
+  int sent_back = 0;
+  int total_recv = 0;
+  int out_of_order = 0;
+  unsigned int mrseq = 0;  // sequence number starts from 1.
+
+  LOG(mlab::INFO, "Running server mode, port %u.", server_port);
+
+  // create server socket
+  scoped_ptr<mlab::ServerSocket> 
+      mysock(mlab::ServerSocket::CreateOrDie(server_port, SOCKETTYPE_UDP, 
+                                             server_family));
+
+  // check socket buffer size
+  if (mysock->GetRecvBufferSize() < packet_size) {
+    LOG(mlab::INFO, "Receive buffer size is smaller than needed, "
+                    "set to needed.");
+    mysock->SetRecvBufferSize(packet_size);
+  }
+
+  if (mysock->GetSendBufferSize() < packet_size) {
+    LOG(mlab::INFO, "Send buffer size is smaller than needed, set to needed.");
+    mysock->SetSendBufferSize(packet_size);
+  }
+
+  // default time out is 5 sec, use it
+  while (1) {
+    errno = 0;
+    mlab::Packet recv_packet = mysock->ReceiveWithError(packet_size);
+    if (errno != 0) {
+      if (errno == EAGAIN) {
+        if (have_data) {
+          // print stats
+          std::cout << "Total received=" << total_recv << " seq received=" <<
+                       seq_recv << " send back=" << sent_back << 
+                       " total out-of-order=" << out_of_order <<
+                       " total unexpected=" << unexpected << std::endl;
+          have_data = false;
+        } else {
+          continue;
+        }
+      } else {
+        LOG(mlab::FATAL, "Receive fails! %s [%d].", strerror(errno), errno);
+      }
+    }
+
+    total_recv++;
+
+    if (recv_packet.length() < (PayloadHeaderLength + sizeof(unsigned int))) {
+      LOG(mlab::VERBOSE, "recv a packet smaller than min size.");
+      unexpected++;
+      continue;
+    }
+
+    std::string head(recv_packet.buffer(), PayloadHeaderLength);
+    if (head.compare(PayloadHeader) != 0){
+      LOG(mlab::VERBOSE, "recv a packet not for this program.");
+      unexpected++;
+      continue;
+    }
+
+    have_data = true;
+    seq_recv++;
+    const unsigned int *seq = 
+        reinterpret_cast<const unsigned int*>(recv_packet.buffer() +
+                                              PayloadHeaderLength);
+
+    unsigned int rseq = ntohl(*seq);
+    if (mrseq > rseq) {
+      out_of_order++;
+    } else {
+      mrseq = rseq;
+    }
+
+    mysock->Send(recv_packet);
+    sent_back++;
+  }
+}
+
+bool MPing::IsServerMode() const {
+  return (server_port > 0);
+}
+
 int MPing::GoProbing(const std::string& dst_addr) {
   size_t maxsize;
   size_t packet_size;  // current packet size, include IP header length
@@ -122,9 +218,12 @@ int MPing::GoProbing(const std::string& dst_addr) {
 
   maxsize = std::max(pkt_size, kMaxBuffer);
 
-  try {
-  scoped_ptr<MpingSocket> mysock(new MpingSocket(dst_addr, src_addr, ttl, 
-                                               maxsize, win_size, dport));
+  scoped_ptr<MpingSocket> mysock(new MpingSocket);
+
+  if (mysock->Initialize(dst_addr, src_addr, ttl, 
+                         maxsize, win_size, dport, client_mode) < 0) {
+    return -1;
+  }
 
   scoped_ptr<MpingStat> mystat(new MpingStat(win_size));
 
@@ -302,7 +401,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
           }
           
           // recv
-          rseq = mysock->ReceiveAndGetSeq(packet_size, &err, mystat.get());
+          rseq = mysock->ReceiveAndGetSeq(&err, mystat.get());
           if (err != 0) {
             //if (err == EINTR)
              // continue;
@@ -320,7 +419,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
               mrseq = rseq;
             }
           }
-#ifdef MP_PRINT_TIMELINE          
+#ifdef MP_PRINT_TIMELINE
           if (out >= 50) {
             break;
           }
@@ -345,27 +444,26 @@ int MPing::GoProbing(const std::string& dst_addr) {
   mystat->PrintTimeLine();
 #endif
 
-  } catch (int e) {
-    return -1;
-  }
-
   return 0;
 }
 
 MPing::MPing(const int& argc, const char **argv) :
-      win_size(4),
-      loop(false),
-      rate(0),
-      slow_start(false),
-      ttl(0),
-      inc_ttl(0),
-      pkt_size(0),
-      loop_size(0),
-      version(false),
-      debug(false),
-      burst(0),
+      win_size(4),                                                              
+      loop(false),                                                              
+      rate(0),                                                                  
+      slow_start(false),                                                        
+      ttl(0),                                                                   
+      inc_ttl(0),                                                               
+      pkt_size(0),                                                              
+      loop_size(0),                                                             
+      version(false),                                                           
+      debug(false),                                                             
+      burst(0),                                                                 
       interval(0),
-      dport(0) {
+      dport(0),
+      server_port(0),
+      server_family(SOCKETFAMILY_UNSPEC),
+      client_mode(false) {
   int ac = argc;
   const char **av = argv;
   const char *p;
@@ -388,6 +486,9 @@ MPing::MPing(const int& argc, const char **argv) :
           case 'S': slow_start = true; av--; break;
           case 'V': version = true; av--; break;
           case 'd': debug = true; av--; break;
+          case 'c': client_mode = true; av--; break;
+          case '4': server_family = SOCKETFAMILY_IPV4; av--; break;
+          case '6': server_family = SOCKETFAMILY_IPV6; av--; break;
           default: LOG(mlab::FATAL, "\n%s", usage); break;
         }
       } else {
@@ -397,6 +498,7 @@ MPing::MPing(const int& argc, const char **argv) :
           case 'R': { rate = atoi(*av); ac--; break; }
           case 'S': { slow_start = true; av--; break; }
           case 't': { ttl = atoi(*av); ac--; break; }
+          case 's': { server_port = atoi(*av); ac--; break; }
           case 'a': { inc_ttl = atoi(*av); ttl = inc_ttl; ac--; break; }
           case 'b': {
             p = *av;
@@ -413,6 +515,9 @@ MPing::MPing(const int& argc, const char **argv) :
           case 'B': { burst = atoi(*av); ac--; break; }
           case 'V': { version = true; av--; break; }
           case 'd': { debug = true; av--; break; }
+          case 'c': { client_mode = true; av--; break; };
+          case '4': { server_family = SOCKETFAMILY_IPV4; av--; break; }
+          case '6': { server_family = SOCKETFAMILY_IPV6; av--; break; }
           case 'F': { src_addr = std::string(*av); ac--; break; }
           default: { 
             LOG(mlab::FATAL, "Unknown parameter -%c\n%s", p[1], usage); break; 
@@ -449,6 +554,19 @@ void MPing::ValidatePara() {
     exit(0);
   }
 
+  // server mode
+  if (server_port > 0) {
+    if (server_port > 65535) {
+      LOG(mlab::FATAL, "Server port cannot larger than 65535.");
+    }
+    
+    if (server_family == SOCKETFAMILY_UNSPEC){
+      LOG(mlab::FATAL, "Need to know the socket family, use -4 or -6.");
+    }
+
+    return;
+  }
+
   if (debug) {
     mlab::SetLogSeverity(mlab::VERBOSE);
   }
@@ -456,6 +574,17 @@ void MPing::ValidatePara() {
   // destination set?
   if (dst_host.empty()) {
     LOG(mlab::FATAL, "Must have destination host. \n%s", usage);
+  }
+
+  // client mode
+  if (client_mode) {
+    if (dport == 0) {
+      LOG(mlab::FATAL, "Client mode must have destination port using -p.");
+    }
+
+    if (ttl == 0) {
+      ttl = kDefaultTTL;
+    }
   }
   
   // TTL
@@ -486,6 +615,11 @@ void MPing::ValidatePara() {
     dest_ips = dest.resolved_ips;
   }
 
+  // max packet size
+  if (pkt_size > 65535) {
+    LOG(mlab::FATAL, "Packet size cannot larger than 65535.");
+  }
+
   // validate local host
   if (src_addr.length() > 0) {
     if (mlab::RawSocket::GetAddrFamily(src_addr) == SOCKETFAMILY_UNSPEC) {
@@ -496,8 +630,8 @@ void MPing::ValidatePara() {
 
   // validate UDP destination port
   if (dport > 0 ) {
-    if (ttl == 0) {
-      LOG(mlab::FATAL, "-p can only use together with -t or -a.\n%s", usage);
+    if (ttl == 0 && !client_mode) {
+      LOG(mlab::FATAL, "-p can only use together with -t -a or -p.\n%s", usage);
     }
 
     if (dport > 65535) {

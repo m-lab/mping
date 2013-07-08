@@ -7,7 +7,11 @@
 int main(int argc, const char** argv) {
   MPing mp(argc, argv);
 
-  mp.Run();
+  if (mp.IsServerMode()) {
+    mp.RunServer();
+  } else {
+    mp.Run();
+  }
 
   return 0;
 }

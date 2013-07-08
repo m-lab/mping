@@ -31,8 +31,9 @@ int AddressFamilyFor(SocketFamily family) {
 
 }  // namespace
 
-MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
-                         int ttl, size_t pktsize, int wndsize, uint16_t port) {
+int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
+                            int ttl, size_t pktsize, int wndsize, 
+                            uint16_t port, bool clientmode) {
   family_ = mlab::RawSocket::GetAddrFamily(destip);
 
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
@@ -68,7 +69,7 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
         AddressFamilyFor(mlab::RawSocket::GetAddrFamily(srcip));
 
     if (mlab::RawSocket::GetAddrFamily(srcip) != family_) {
-      throw 0;
+      return -1;
     }
 
     switch (srcaddr_.ss_family) {
@@ -96,20 +97,20 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
         mlab::RawSocket::Create(SOCKETTYPE_ICMP, family_);
 
     if (icmp_sock == NULL) {
-      throw 0;
+      return -1;
     }
 
     // bind if specified src ip
     if (srcip.length() != 0) {
       if (icmp_sock->Bind(mlab::Host(srcip)) < 0) {
-        throw 0;
+        return -1;
       }
     }
 
     // connect to only receive packets from destip.
     // set it because we only need ECHO REQ/REP for icmp only send/recv
     if (icmp_sock->Connect(mlab::Host(destip)) < 0) {
-      throw 0;
+      return -1;
     }
 
     // initialize packet
@@ -135,7 +136,7 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
       }
       case SOCKETFAMILY_UNSPEC: {
         LOG(mlab::ERROR, "Unknown socket family.");
-        throw 0;
+        return -1;
       }
     }
 
@@ -162,7 +163,7 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
     udp_sock = mlab::ClientSocket::Create(mlab::Host(destip), dport,
                                                SOCKETTYPE_UDP, family_);
     if (udp_sock == NULL) {
-      throw 0;
+      return -1;
     }
 
     // bind UDP socket to a src ip with port 0 (kernel will choose random port)
@@ -194,7 +195,7 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
                   size) < 0) {
         LOG(mlab::ERROR, "un-connect UDP socket fails. %s [%d]", 
             strerror(errno), errno);
-        throw 0;
+        return -1;
       }
 
       // bind to send from specified address, 
@@ -204,7 +205,7 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
         LOG(mlab::ERROR, 
             "Bind UDP socket to source address %s fails. %s [%d]", 
             srcip.c_str(), strerror(errno), errno);
-        throw 0;
+        return -1;
       }
 
       // re-connect to destip
@@ -212,34 +213,42 @@ MpingSocket::MpingSocket(const std::string& destip, const std::string& srcip,
             size) < 0) {
         LOG(mlab::ERROR, "re-connect UDP socket fails. %s [%d]", 
             strerror(errno), errno);
-        throw 0;
+        return -1;
       }
       
     }
 
-    // icmp to recv
-    icmp_sock = 
-        mlab::RawSocket::Create(SOCKETTYPE_ICMP, family_);
+    if (!clientmode) {
+      // icmp to recv
+      icmp_sock = 
+          mlab::RawSocket::Create(SOCKETTYPE_ICMP, family_);
 
-    if (icmp_sock == NULL) {
-      throw 0;
+      if (icmp_sock == NULL) {
+        return -1;
+      }
+
+      // icmp_sock->Connect(mlab::Host(destip));
+      
+      // validate socket buffer size
+      if (icmp_sock->GetRecvBufferSize() < (pktsize * wndsize)) {
+        LOG(mlab::INFO, "Set recv buffer to %lu.", pktsize * wndsize);
+        icmp_sock->SetRecvBufferSize(pktsize * wndsize);
+      }
+        
+      if (udp_sock->GetSendBufferSize() < pktsize) {
+        LOG(mlab::INFO, "Set send buffer to %lu.", pktsize * wndsize);
+        udp_sock->SetSendBufferSize(pktsize);
+      }
+    } else {
+      client_mode_ = true;
     }
-
-    // icmp_sock->Connect(mlab::Host(destip));
 
     // build packet
     memcpy(buffer_, kPayloadHeader, kPayloadHeaderLength);
     buffer_length_ = kPayloadHeaderLength;
-
-    // validate socket buffer size
-    if (icmp_sock->GetRecvBufferSize() < (pktsize * wndsize)) {
-      icmp_sock->SetRecvBufferSize(pktsize * wndsize);
-    }
-      
-    if (udp_sock->GetSendBufferSize() < pktsize) {
-      udp_sock->SetSendBufferSize(pktsize);
-    }
   }
+
+  return 0;
 }
 
 bool MpingSocket::SetSendTTL(const int& ttl) {
@@ -261,7 +270,8 @@ MpingSocket::~MpingSocket() {
   udp_sock = NULL;
 }
 
-size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size, int *error) const {
+size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size, 
+                               int *error) const {
   char buf[size];
   size_t send_size = 0;
   unsigned int* seq_ptr;
@@ -311,291 +321,168 @@ size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size, int *error)
   }
 }
 
-unsigned int MpingSocket::ReceiveAndGetSeq(size_t size, int* error, 
+unsigned int MpingSocket::ReceiveAndGetSeq(int* error, 
                                            MpingStat *mpstat) {
-  ASSERT(icmp_sock != NULL);
+  if (client_mode_) {
+    ASSERT(udp_sock != NULL);
+  } else {
+    ASSERT(icmp_sock != NULL);
+  }
+  ASSERT(mpstat != NULL);
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
 
-  size_t recv_size = 0;
+//  size_t recv_size = 0;
+  size_t min_recv_size = 0;
+  size_t should_recv_size = 0;
+  size_t icmp_offset = 0;
+  size_t payload_offset = sizeof(mlab::ICMP4Header);
   int err = 0;
 
-  if (!use_udp_) {
-    switch (family_) {
-      case SOCKETFAMILY_IPV4: {
-        // parse IP header, ICMP header
-        recv_size = size;
-        LOG(mlab::VERBOSE, "start receive loop.")
-        while (1) {
-          mlab::Packet recv_packet = icmp_sock->ReceiveWithError(recv_size,
-                                                                 &err);
+  LOG(mlab::VERBOSE, "start receive loop.");
 
-          if (err != 0) {
-            *error = err;
-            return 0;
-          }
+  switch (family_) {
+    case SOCKETFAMILY_IPV4: {
+      min_recv_size = sizeof(mlab::IP4Header) + sizeof(mlab::ICMP4Header);
+      icmp_offset = sizeof(mlab::IP4Header);
 
-          if (recv_packet.length() >= sizeof(mlab::IP4Header) + buffer_length_
-                                      + sizeof(unsigned int)) {
-            const mlab::ICMP4Header *icmp_ptr;
-            const char *ptr = recv_packet.buffer();
-            ptr += sizeof(mlab::IP4Header);
-
-            icmp_ptr = reinterpret_cast<const mlab::ICMP4Header *>(ptr);
-
-            if (icmp_ptr->icmp_type == ICMP_ECHOREPLY) {
-              ptr += sizeof(mlab::ICMP4Header);
-
-              std::string head(ptr, kPayloadHeaderLength);  // check payload
-              if (head.compare(kPayloadHeader) == 0) {
-                const unsigned int *seq = 
-                    reinterpret_cast<const unsigned int*>(
-                        ptr+ kPayloadHeaderLength);
-                *error = err;
-                return ntohl(*seq);
-              } else {
-                LOG(mlab::VERBOSE, "recv an echoreply from the right target"
-                    " but not for this program.");
-                mpstat->LogUnexpected();
-              }
-            } else {
-              LOG(mlab::VERBOSE, 
-                  "recv a non-echoreply packet. ICMP type %u, code %u.",
-                  icmp_ptr->icmp_type, icmp_ptr->icmp_code);
-              mpstat->LogUnexpected();
-            }
-          } else {
-            if (recv_packet.length() >= sizeof(mlab::IP4Header) +
-                                        sizeof(mlab::ICMP4Header)) {
-              const char *ptr = recv_packet.buffer();
-              ptr += sizeof(mlab::IP4Header);
-              const mlab::ICMP4Header *icmp_ptr = 
-                  reinterpret_cast<const mlab::ICMP4Header *>(ptr);
-              LOG(mlab::VERBOSE, 
-                  "recv icmp packet size %lu is smaller than expected %lu."
-                  "ICMP type %u code %u.", recv_packet.length(),
-                  sizeof(mlab::IP4Header) + buffer_length_ + 
-                  sizeof(unsigned int),
-                  icmp_ptr->icmp_type, 
-                  icmp_ptr->icmp_code);
-            } else {
-              LOG(mlab::VERBOSE, "recv a packet smaller than regular ICMP.");
-            }
-
-            mpstat->LogUnexpected();
-          }
-        }
-        break;
+      if (use_udp_) {
+        // recv_size = size + sizeof(mlab::IP4Header) + 
+         //           sizeof(mlab::ICMP4Header);
+        should_recv_size = 2 * sizeof(mlab::IP4Header) + 
+                           sizeof(mlab::ICMP4Header) +
+                           sizeof(mlab::UDPHeader) +
+                           buffer_length_ + sizeof(unsigned int);
+        payload_offset = payload_offset +
+                         sizeof(mlab::IP4Header) + sizeof(mlab::UDPHeader);
+      } else {
+        // recv_size = size;
+        should_recv_size = sizeof(mlab::IP4Header) + buffer_length_ + 
+                      sizeof(unsigned int);
       }
-      case SOCKETFAMILY_IPV6: {
-        // parse ICMP6 header
-        recv_size = size - sizeof(mlab::IP6Header);
 
-        while (1) {
-          mlab::Packet recv_packet = icmp_sock->ReceiveWithError(recv_size,
-                                                                 &err);
-
-          if (err != 0) {
-            *error = err;
-            return 0;
-          }
-
-          if (recv_packet.length() >= buffer_length_ + sizeof(unsigned int)) {
-            const mlab::ICMP6Header *icmp_ptr;
-            const char *ptr = recv_packet.buffer();
-
-            icmp_ptr = reinterpret_cast<const mlab::ICMP6Header *>(ptr);
-            if (icmp_ptr->icmp6_type == 129) {  // ICMP6_ECHO_REPLY
-              ptr += sizeof(mlab::ICMP6Header);
-              std::string head(ptr, kPayloadHeaderLength);
-              if (head.compare(kPayloadHeader) == 0) {
-                const unsigned int *seq =
-                    reinterpret_cast<const unsigned int*>(ptr+
-                                                         kPayloadHeaderLength);
-                *error = err;
-                return ntohl(*seq);
-              } else {
-                LOG(mlab::VERBOSE, "recv an echoreply from the right target"
-                    " but not for this program");
-                mpstat->LogUnexpected();
-              }
-            } else {
-              LOG(mlab::VERBOSE,
-                  "recv a non-echoreply packet ICMP type %u, code %u.",
-                  icmp_ptr->icmp6_type, icmp_ptr->icmp6_code);
-              mpstat->LogUnexpected();
-            }
-          } else {
-            if (recv_packet.length() >= sizeof(mlab::ICMP6Header)) {
-              const char *ptr = recv_packet.buffer();
-              const mlab::ICMP6Header *icmp_ptr = 
-                  reinterpret_cast<const mlab::ICMP6Header *>(ptr);
-              LOG(mlab::VERBOSE, 
-                  "recv icmp packet size %lu is smaller than expected %lu."
-                  "ICMP type %u code %u.", recv_packet.length(),
-                  buffer_length_ + sizeof(unsigned int),
-                  icmp_ptr->icmp6_type, icmp_ptr->icmp6_code);
-            } else {
-              LOG(mlab::VERBOSE, "recv a packet smaller than regular ICMPv6.");
-            }
-            mpstat->LogUnexpected();
-          }
-        }
-        break;
-      }
-      case SOCKETFAMILY_UNSPEC: return 0;  // only for eliminate compile error
+      break;
     }
-  } else {  // UDP, need to reserve incoming packet's src address
-    switch (family_) {
-      case SOCKETFAMILY_IPV4: {
-        // Parse IP header ICMP header IP header UDP header...
-        recv_size = size + sizeof(mlab::IP4Header) + sizeof(mlab::ICMP4Header);
-        mlab::Host fromip("127.0.0.1");
-        while (1) {
-          mlab::Packet recv_packet = icmp_sock->ReceiveFromWithError(recv_size,
-                                                                     &fromip,
-                                                                     &err);
-
-          if (err != 0) {
-            *error = err;
-            return 0;
-          }
-          
-          if (recv_packet.length() >= 2 * sizeof(mlab::IP4Header) +
-                                      sizeof(mlab::ICMP4Header) +
-                                      sizeof(mlab::UDPHeader) + 
-                                      buffer_length_) {
-            const mlab::ICMP4Header *icmp_ptr;
-            const char *ptr = recv_packet.buffer();
-
-            icmp_ptr = 
-                reinterpret_cast<const mlab::ICMP4Header *>(ptr+
-                                                            sizeof(
-                                                            mlab::IP4Header));
-            if (icmp_ptr->icmp_type == ICMP_DEST_UNREACH || 
-                icmp_ptr->icmp_type == ICMP_TIME_EXCEEDED) {
-              const mlab::IP4Header *ip_ptr;
-              ptr += (sizeof(mlab::ICMP4Header) + sizeof(mlab::IP4Header));
-              ip_ptr = reinterpret_cast<const mlab::IP4Header *>(ptr);
-              if (ip_ptr->protocol == IPPROTO_UDP) {
-                ptr += (sizeof(mlab::IP4Header) + sizeof(mlab::UDPHeader));
-                std::string head(ptr, kPayloadHeaderLength);
-                if (head.compare(kPayloadHeader) == 0) {
-                  fromaddr_ = fromip.original_hostname;
-                  const unsigned int *seq =
-                      reinterpret_cast<const unsigned int*>(ptr+
-                                                         kPayloadHeaderLength);
-                  *error = err;
-                  return ntohl(*seq);
-                } else {
-                  LOG(mlab::VERBOSE, "recv an ICMP from the right target"
-                      " but not for this program.");
-                  mpstat->LogUnexpected();
-                }
-              } else {
-                LOG(mlab::VERBOSE, "not an ICMP for UDP, protocol %u.",
-                    ip_ptr->protocol);
-                mpstat->LogUnexpected();
-              }
-            } else {
-              LOG(mlab::VERBOSE, 
-                  "recv an ICMP message with wrong type, type %u code %u",
-                  icmp_ptr->icmp_type, icmp_ptr->icmp_code);
-              mpstat->LogUnexpected();
-            }
-          } else {
-            if (recv_packet.length() >= sizeof(mlab::IP4Header) + 
-                                        sizeof(mlab::ICMP4Header)) {
-              const char *ptr = recv_packet.buffer() + sizeof(mlab::IP4Header);
-              const mlab::ICMP4Header *icmp_ptr = 
-                  reinterpret_cast<const mlab::ICMP4Header *>(ptr);
-              LOG(mlab::VERBOSE,
-                  "recv icmp packet size %lu is smaller than expected %lu."
-                  "ICMP type %u code %u.", recv_packet.length(),
-                  2 * sizeof(mlab::IP4Header) +
-                  sizeof(mlab::ICMP4Header) + sizeof(mlab::UDPHeader) +
-                  buffer_length_, icmp_ptr->icmp_type, icmp_ptr->icmp_code);
-            } else {
-              LOG(mlab::VERBOSE, "recv a packet smaller than regular ICMP.");
-            }
-            mpstat->LogUnexpected();
-          }
-        }
-        break;
+    case SOCKETFAMILY_IPV6: {
+      if (use_udp_) {
+        // recv_size = size + sizeof(mlab::ICMP6Header);
+        should_recv_size = sizeof(mlab::ICMP6Header) + 
+                           sizeof(mlab::IP6Header) +
+                           sizeof(mlab::UDPHeader) +
+                           buffer_length_ + sizeof(unsigned int);
+        payload_offset = payload_offset + 
+                         sizeof(mlab::IP6Header) + sizeof(mlab::UDPHeader);
+      } else {
+        // recv_size = size - sizeof(mlab::IP6Header);
+        should_recv_size = buffer_length_ + sizeof(unsigned int);
       }
-      case SOCKETFAMILY_IPV6: {
-        recv_size = size + sizeof(mlab::ICMP6Header); 
-        mlab::Host fromip("127.0.0.1");
-        while (1) {
-          mlab::Packet recv_packet = icmp_sock->ReceiveFromWithError(recv_size,
-                                                                     &fromip,
-                                                                     &err);
-          if (err != 0) {
-            *error = err;
-            return 0;
-          }
 
-          if (recv_packet.length() >= sizeof(mlab::ICMP6Header) +
-                                      sizeof(mlab::IP6Header) +
-                                      sizeof(mlab::UDPHeader) +
-                                      buffer_length_) {
-            const mlab::ICMP6Header *icmp_ptr;
-            const char *ptr = recv_packet.buffer();
-
-            icmp_ptr = reinterpret_cast<const mlab::ICMP6Header *>(ptr);
-            if (icmp_ptr->icmp6_type == 1 ||
-                icmp_ptr->icmp6_type == 3) {
-              const mlab::IP6Header *ip_ptr;
-              ptr += sizeof(mlab::ICMP6Header);
-              ip_ptr = reinterpret_cast<const mlab::IP6Header *>(ptr);
-              if (ip_ptr->next_header == IPPROTO_UDP) {
-                ptr += (sizeof(mlab::IP6Header) + sizeof(mlab::UDPHeader));
-                std::string head(ptr, kPayloadHeaderLength);
-                if (head.compare(kPayloadHeader) == 0) {
-                  fromaddr_ = fromip.original_hostname;
-                  const unsigned int *seq =
-                      reinterpret_cast<const unsigned int*>(ptr+
-                                                         kPayloadHeaderLength);
-                  *error = err;
-                  return ntohl(*seq);
-                } else {
-                  LOG(mlab::VERBOSE, "recv an ICMP from the right target"
-                      " but not for this program.");
-                  mpstat->LogUnexpected();
-                }
-              } else {
-                LOG(mlab::VERBOSE, "not an ICMP for UDP, protocol %u.",
-                    ip_ptr->next_header);
-                mpstat->LogUnexpected();
-              }
-            } else {
-              LOG(mlab::VERBOSE, 
-                  "recv an ICMP message with wrong type, type %u code %u.",
-                  icmp_ptr->icmp6_type, icmp_ptr->icmp6_code);
-              mpstat->LogUnexpected();
-            }
-          } else {
-            if (recv_packet.length() >= sizeof(mlab::ICMP6Header)) {
-              const char *ptr = recv_packet.buffer();
-              const mlab::ICMP6Header *icmp_ptr = 
-                  reinterpret_cast<const mlab::ICMP6Header *>(ptr);
-              LOG(mlab::VERBOSE, 
-                  "recv icmp packet size %lu is smaller than expected %lu."
-                  "ICMP type %u code %u.", recv_packet.length(),
-                  sizeof(mlab::ICMP6Header) + sizeof(mlab::IP6Header) +
-                  sizeof(mlab::UDPHeader) + buffer_length_,
-                  icmp_ptr->icmp6_type, icmp_ptr->icmp6_code);
-            } else {
-              LOG(mlab::VERBOSE, "recv a packet smaller than regular ICMP.");
-            }
-            mpstat->LogUnexpected();
-          }
-        }
-        break;
-      }
-      case SOCKETFAMILY_UNSPEC: return 0;
+      min_recv_size = sizeof(mlab::ICMP6Header);
+      break;
     }
+    case SOCKETFAMILY_UNSPEC:
+      return 0;
   }
-  return 0;
+
+  if (client_mode_) {
+    should_recv_size = buffer_length_ + sizeof(unsigned int);
+    payload_offset = 0;
+  }
+
+  const char *ptr;
+  while (1) {
+    mlab::Packet recv_packet(""); 
+    if (client_mode_) {
+      recv_packet = udp_sock->ReceiveWithError(should_recv_size, &err);
+    } else {
+      recv_packet = icmp_sock->ReceiveWithError(should_recv_size, &err);
+    }
+
+    if (err != 0) {
+      *error = err;
+      return 0;
+    }
+    ptr = recv_packet.buffer();
+
+    if (!client_mode_) {
+      // check length: ICMP?
+      if (recv_packet.length() < min_recv_size) {
+        LOG(mlab::VERBOSE, "recv a packet smaller than regular %s.",
+            family_==SOCKETFAMILY_IPV4?"ICMP":"ICMPv6");
+        mpstat->LogUnexpected();
+        continue;
+      }
+      ptr += icmp_offset;  // now ptr is at icmp header
+      const mlab::ICMP4Header *icmp_ptr =
+          reinterpret_cast<const mlab::ICMP4Header *>(ptr);
+
+      // check length: include payload?
+      if (recv_packet.length() < should_recv_size) {
+        LOG(mlab::VERBOSE,
+            "recv icmp packet size is smaller than expected. "
+            "ICMP type %u code %u.", icmp_ptr->icmp_type, 
+            icmp_ptr->icmp_code);
+        mpstat->LogUnexpected();
+        continue;
+      }
+
+      // check ICMP message type: echo reply? or dst_unreach time_exceeded?
+      if (use_udp_) {
+        if (icmp_ptr->icmp_type != 
+                (family_==SOCKETFAMILY_IPV4?ICMP_DEST_UNREACH:1) &&
+            icmp_ptr->icmp_type != 
+                (family_==SOCKETFAMILY_IPV4?ICMP_TIME_EXCEEDED:3)) {
+          LOG(mlab::VERBOSE,
+              "recv an ICMP message with wrong type, type %u code %u",
+              icmp_ptr->icmp_type, icmp_ptr->icmp_code);
+          mpstat->LogUnexpected();
+          continue;
+        }
+
+        // UDP, check IP protocol type: UDP?
+        uint8_t proto;
+        if (family_==SOCKETFAMILY_IPV4) {
+          const mlab::IP4Header *ip_ptr = 
+              reinterpret_cast<const mlab::IP4Header *>(ptr + 
+                                                     sizeof(mlab::ICMP4Header));
+          proto = ip_ptr->protocol;
+        } else {
+          const mlab::IP6Header *ip_ptr = 
+              reinterpret_cast<const mlab::IP6Header *>(ptr + 
+                                                     sizeof(mlab::ICMP4Header));
+          proto = ip_ptr->next_header;
+        }
+
+        if (proto != IPPROTO_UDP) {
+          LOG(mlab::VERBOSE, "not an ICMP for UDP, for protocol %u.", proto);
+          mpstat->LogUnexpected();
+          continue;
+        }
+      } else {
+        if (icmp_ptr->icmp_type != 
+                (family_==SOCKETFAMILY_IPV4?ICMP_ECHOREPLY:129)) {
+          LOG(mlab::VERBOSE,
+              "recv a non-echoreply packet. ICMP type %u, code %u.",
+              icmp_ptr->icmp_type, icmp_ptr->icmp_code);
+          mpstat->LogUnexpected();
+          continue;
+        }
+      }
+    }
+
+    // check payload
+    ptr += payload_offset;  // now ptr is at application payload
+    std::string head(ptr, kPayloadHeaderLength);
+    if (head.compare(kPayloadHeader) != 0) {
+      LOG(mlab::VERBOSE, "recv an packet not for this program.");
+      mpstat->LogUnexpected();
+      continue;
+    }
+
+    ptr += kPayloadHeaderLength;
+    const unsigned int *seq = reinterpret_cast<const unsigned int*>(ptr);
+    *error = err;
+    return ntohl(*seq);
+  }
 }
 
 const std::string MpingSocket::GetFromAddress() const {

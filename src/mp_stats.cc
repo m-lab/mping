@@ -131,7 +131,15 @@ void MpingStat::PrintTempStats() {
   unexpect_num_temp_ = 0;
 }
 
-void MpingStat::PrintStats() const {
+void MpingStat::PrintStats() {
+  // check last round losts
+  for (unsigned int i = 0; i < send_queue_size_; i++) {
+    if (send_queue.at(i).recv_time.tv_sec == 0) {
+      lost_num_++;
+      lost_num_temp_++;
+    }
+  }
+
   std::cout << "Total sent=" << send_num_ << " received=" << recv_unique_num_ <<
                " Total received=" << recv_num_ << " total out-of-order=" <<
                out_of_order_ << " total lost=" << lost_num_ << "(" <<
