@@ -470,7 +470,7 @@ unsigned int MpingSocket::ReceiveAndGetSeq(int* error,
     }
 
     // check payload
-    ptr += payload_offset;  // now ptr is at application payload
+    ptr += payload_offset;  // now ptr is at the beginning of the payload
     std::string head(ptr, kPayloadHeaderLength);
     if (head.compare(kPayloadHeader) != 0) {
       LOG(mlab::VERBOSE, "recv an packet not for this program.");
