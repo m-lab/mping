@@ -21,6 +21,7 @@ double time_sub(const struct timeval *new_t, const struct timeval *old_t) {
 
   return (temp.tv_sec * 1000.0 + temp.tv_usec / 1000.0);  // in millisec
 }
+
 }  // namespace
 
 void MpingStat::EnqueueSend(unsigned int seq, 

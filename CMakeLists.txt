@@ -30,14 +30,17 @@ include_directories(
   ${MLAB_LIBRARIES_ROOT}/include
   ${GTEST_ROOT}/include)
 
+file(GLOB_RECURSE SRC_FILES src/*.cc)
+
+
 link_directories(
   ${MLAB_LIBRARIES_ROOT}/lib
   ${GTEST_ROOT}/lib)
  
 file(GLOB_RECURSE SRC_FILES src/*.cc)
 
-# Build the libraries
-# Nothing
+# Build the libraries first
+add_subdirectory(${MLAB_LIBRARIES_ROOT})
 
 # Build 
 add_executable(mping ${SRC_FILES})
@@ -45,5 +48,3 @@ target_link_libraries(mping mlab)
 
 # Build supplement targets
 add_subdirectory(test)
-#add_subdirectory(${MLAB_LIBRARIES_ROOT})
-#add_subdirectory(${GTEST_ROOT})
