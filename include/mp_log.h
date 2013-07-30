@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _MLAB_LOG_H_
-#define _MLAB_LOG_H_
+#ifndef _MPING_LOG_H_
+#define _MPING_LOG_H_
 
-#include "mlab/mlab.h"
 
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace mlab {
+enum LogSeverity {
+  VERBOSE,
+  INFO,
+  WARNING,
+  ERROR,
+  FATAL
+};
 
-FILE* GetSeverityFD(mlab::LogSeverity s);
-const char* GetSeverityTag(mlab::LogSeverity s);
-
-}  // namespace mlab
+void SetLogSeverity(LogSeverity s);
+FILE* GetSeverityFD(LogSeverity s);
+const char* GetSeverityTag(LogSeverity s);
 
 #define ASSERT(predicate) if (!(predicate)) raise(SIGABRT)
 
@@ -37,8 +41,24 @@ const char* GetSeverityTag(mlab::LogSeverity s);
       fprintf(fd, format, ##__VA_ARGS__); \
       fprintf(fd, "\n"); \
       fflush(fd); \
-      ASSERT(severity != mlab::FATAL); \
+      ASSERT(severity != FATAL); \
     } \
   }
 
-#endif  // _MLAB_LOG_H_
+enum MPLogLevel {
+  MPLOG_DEF,
+  MPLOG_TTL,
+  MPLOG_BUF,
+  MPLOG_WIN
+};
+
+void PrintMpingLogLevel(MPLogLevel level);
+
+// MPLOG only print information that would be parsed
+#define MPLOG(level, format, ...) { \
+  PrintMpingLogLevel(level); \
+  fprintf(stdout, format, ##__VA_ARGS__); \
+  fprintf(stdout, "\n"); \
+  fflush(stdout); \
+}
+#endif  // _MPING_LOG_H_

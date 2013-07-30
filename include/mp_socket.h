@@ -14,16 +14,15 @@
 
 #ifndef _MP_SOCKET_H_
 #define _MP_SOCKET_H_
+#include "string.h"
 
 #include "mlab/client_socket.h"
 #include "mlab/socket_family.h"
 #include "mlab/raw_socket.h"
 #include "mp_stats.h"
-#include "log.h"
 
 class MpingSocket {
   public:
-    
     MpingSocket() :
       icmp_sock(NULL),
       udp_sock(NULL),

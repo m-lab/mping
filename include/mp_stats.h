@@ -16,7 +16,7 @@
 #define _MPING_STATS_H_
 
 #include <vector>
-#include <time.h>
+#include <sys/time.h>
 
 struct SendQueueNode {
   unsigned int seq;
@@ -27,7 +27,7 @@ struct SendQueueNode {
 
 class MpingStat {
   public:
-    MpingStat(const int& win_size) : 
+    MpingStat() : 
       unexpect_num_(0),
       unexpect_num_temp_(0),
       max_recv_seq_(1),
@@ -43,8 +43,14 @@ class MpingStat {
       duplicate_num_temp_(0),
       lost_num_(0),
       lost_num_temp_(0),
-      window_size_(win_size),
-      send_queue_size_(4 * win_size) { 
+      window_size_(0),
+      send_queue_size_(0),
+      started(false) { 
+    }
+
+    void SetWindowSize(int win_size) {
+      window_size_ = win_size;
+      send_queue_size_ = 4 * win_size;
       send_queue.reserve(sizeof(SendQueueNode) * 4 * window_size_);
     }
 
@@ -56,6 +62,14 @@ class MpingStat {
     void PrintTempStats();
     void PrintTimeLine() const;
 
+    std::vector<int> timeline;
+    std::vector<unsigned long> time_of_packets;  // relative time to start_time
+    std::vector<long> seq_of_packets;
+
+    void ReserveTimeSeqVectors();
+    void InsertSequenceTime(int seq, const struct timeval& now);
+    void InsertIntervalBoundry(const struct timeval& now);
+    void PrintResearch() const;
   protected:
     unsigned int unexpect_num_;
     unsigned int unexpect_num_temp_;
@@ -75,7 +89,12 @@ class MpingStat {
     int window_size_;
     unsigned int send_queue_size_;
     std::vector<struct SendQueueNode> send_queue;
-    std::vector<int> timeline;
+
+  private:
+    bool started;
+    struct timeval start_time;
+
+    std::vector<unsigned long> interval_boundry;
 };
 
 #endif

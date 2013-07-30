@@ -10,7 +10,7 @@ int main(int argc, const char** argv) {
   if (mp.IsServerMode()) {
     mp.RunServer();
   } else {
-    mp.Run();
+    mp.RunClient();
   }
 
   return 0;

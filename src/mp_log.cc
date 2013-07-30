@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "log.h"
+#include "mp_log.h"
 
 #include <stdio.h>
 
-namespace mlab{
 namespace {
 #if defined(DEBUG)
   LogSeverity min_severity = VERBOSE;
@@ -43,7 +42,7 @@ FILE* GetSeverityFD(LogSeverity s) {
   return NULL;
 }
 
-const char* GetSeverityTag(mlab::LogSeverity s) {
+const char* GetSeverityTag(LogSeverity s) {
   switch (s) {
     case VERBOSE: return "V";
     case INFO: return "I";
@@ -53,4 +52,11 @@ const char* GetSeverityTag(mlab::LogSeverity s) {
   }
   return "";
 }
-}  // namespace mlab
+
+void PrintMpingLogLevel(MPLogLevel level) {
+  int blank_number = level;
+  while (blank_number > 0) {
+    fprintf(stdout, " ");
+    blank_number--;
+  }
+}

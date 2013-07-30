@@ -5,22 +5,26 @@
 #include "mlab/mlab.h"
 #include "mp_mping.h"
 #include "mp_stats.h"
-#include "log.h"
+#include "mp_log.h"
 
 namespace {
 
-double time_sub(const struct timeval *new_t, const struct timeval *old_t) {
+unsigned long time_sub(const struct timeval& new_t, 
+                       const struct timeval& old_t) {
   struct timeval temp;
 
-  temp.tv_usec = new_t->tv_usec - old_t->tv_usec;
-  temp.tv_sec = new_t->tv_sec - old_t -> tv_sec;
+  temp.tv_usec = new_t.tv_usec - old_t.tv_usec;
+  temp.tv_sec = new_t.tv_sec - old_t.tv_sec;
   if (temp.tv_usec < 0) {
     --temp.tv_sec;
     temp.tv_usec += 1000000;
   }
 
-  return (temp.tv_sec * 1000.0 + temp.tv_usec / 1000.0);  // in millisec
+  return (temp.tv_sec * 1000000 + temp.tv_usec);  // in usec
 }
+
+const int kDefaultVectorLength = 20000;
+const int kDefaultRunTime = 3600;
 
 }  // namespace
 
@@ -47,10 +51,10 @@ void MpingStat::EnqueueSend(unsigned int seq,
     send_queue.at(idx) = TempNode;
   }
   
-#ifdef MP_PRINT_TIMELINE
+#ifdef MP_TEST
   // timeline
   if (seq > INT_MAX) {
-    LOG(mlab::FATAL, "send sequence number is too large.");
+    LOG(FATAL, "send sequence number is too large.");
   } else {
     timeline.push_back((int)seq);
   }
@@ -86,9 +90,9 @@ void MpingStat::EnqueueRecv(unsigned int seq,
   recv_num_temp_++;
 
   // timeline
-#ifdef MP_PRINT_TIMELINE
+#ifdef MP_TEST
   if (seq > INT_MAX) {
-    LOG(mlab::FATAL, "recv sequence number is too large.");
+    LOG(FATAL, "recv sequence number is too large.");
   } else {
     int s = (int)seq;
     timeline.push_back(0 - s);
@@ -116,12 +120,10 @@ void MpingStat::PrintTimeLine() const {
 }
 
 void MpingStat::PrintTempStats() {
-  std::cout << "Sent " << send_num_temp_ << " received " << 
-               recv_unique_num_temp_ <<
-               " total received " << recv_num_temp_ << " out-of-order " << 
-               out_of_order_temp_ << " lost " << lost_num_temp_ << " dup " <<
-               duplicate_num_temp_ << " unexpected " << unexpect_num_temp_ << 
-               std::endl;
+  MPLOG(MPLOG_WIN, "sent:%u;received:%u;total received:%u;out-of-order:%u;"
+                   "lost:%u;dup:%u;unexpected:%u", send_num_temp_,
+                   recv_unique_num_temp_, recv_num_temp_, out_of_order_temp_,
+                   lost_num_temp_, duplicate_num_temp_, unexpect_num_temp_);
 
   send_num_temp_ = 0;
   recv_num_temp_ = 0;
@@ -141,10 +143,45 @@ void MpingStat::PrintStats() {
     }
   }
 
-  std::cout << "Total sent=" << send_num_ << " received=" << recv_unique_num_ <<
-               " Total received=" << recv_num_ << " total out-of-order=" <<
-               out_of_order_ << " total lost=" << lost_num_ << "(" <<
-               lost_num_ * 100.0 / send_num_ << ")" << " total dup=" << 
-               duplicate_num_ << " total unexpected=" << unexpect_num_ << 
-               std::endl;
+  MPLOG(MPLOG_DEF, "total_sent:%u;received:%u;total_received:%u;"
+                   "total_out-of-order:%u;total_lost:%u:%f%%;total_dup:%u;"
+                   "total_unexpected:%u", send_num_, recv_unique_num_,
+                   recv_num_, out_of_order_, lost_num_, 
+                   lost_num_ * 100.0 / send_num_, duplicate_num_,
+                   unexpect_num_);
+}
+
+void MpingStat::ReserveTimeSeqVectors() {
+  time_of_packets.reserve(sizeof(unsigned long) * kDefaultVectorLength);
+  seq_of_packets.reserve(sizeof(long) * kDefaultVectorLength);
+  interval_boundry.reserve(sizeof(unsigned long) * kDefaultRunTime);
+}
+
+void MpingStat::InsertSequenceTime(int seq, const struct timeval& now) {
+  if (!started) {
+    started = true;
+    start_time = now;
+    time_of_packets.push_back(0);
+    seq_of_packets.push_back((long)seq);
+  }
+  
+  if (started) {
+    time_of_packets.push_back(time_sub(now, start_time));
+    seq_of_packets.push_back((long)seq);
+  }
+}
+
+void MpingStat::InsertIntervalBoundry(const struct timeval& now) {
+  interval_boundry.push_back(time_sub(now, start_time));
+}
+
+void MpingStat::PrintResearch() const {
+  for (unsigned int i = 0; i < time_of_packets.size(); i++) {
+    MPLOG(MPLOG_DEF, "[Research seq-time];%ld;%lu", 
+          seq_of_packets.at(i), time_of_packets.at(i));
+  }
+
+  for (unsigned int j = 0; j < interval_boundry.size(); j++) {
+    MPLOG(MPLOG_DEF, "[Research interval-switch];%lu", interval_boundry.at(j));
+  }
 }

@@ -7,7 +7,7 @@ echo "set term png" > temp.gnuplot
 echo "set output \"output.png\"" >> temp.gnuplot
 echo "set xlabel 'Number of packet in flight'" >> temp.gnuplot
 echo "set ylabel 'Packets per second'" >> temp.gnuplot
-echo "set key bottom right" >> temp.gnuplot
+echo "set key top left" >> temp.gnuplot
 
 if [ "$#" -gt "$a" ]
 then

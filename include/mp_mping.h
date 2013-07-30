@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <set>
 #include <string>
+
+#include "mp_socket.h"
+#include "mp_stats.h"
 #include "mlab/socket_family.h"
 
 //#define MP_PRINT_TIMELINE
@@ -25,17 +28,20 @@
 class MPing{
   public:
     MPing(const int& argc, const char **argv); 
-    void Run();
-    void RunServer();
     bool IsServerMode() const;
- 
-  private:
+    void RunServer();
+    void RunClient();
+
+  protected:
+    FRIEND_TEST(MpingPacketIO, DynWindow);
+    FRIEND_TEST(MpingPacketIO, DynWindowBurst);
+    // config parameters
     int        win_size;  
     bool       loop;
     int        rate;
     bool       slow_start;
-    int ttl;
-    int inc_ttl;  // auto increase TTL to this value
+    int        ttl;
+    int        inc_ttl;  // auto increase TTL to this value
     size_t     pkt_size;  // packet size in bytes
     int        loop_size;  // -1 to -4
     bool       version;
@@ -49,9 +55,33 @@ class MPing{
     std::string src_addr;
     std::string dst_host;
     std::set<std::string> dest_ips;
+    MpingStat  mp_stat;
+    bool       print_seq_time;
 
-    int GoProbing(const std::string& dst_addr);
     void ValidatePara();
+    virtual bool GoProbing(const std::string& dst_addr);
+    virtual void TTLLoop(MpingSocket *sock, MpingStat *stat);
+    virtual void BufferLoop(MpingSocket *sock, MpingStat *stat);
+    virtual void WindowLoop(MpingSocket *sock, MpingStat *stat);
+    virtual void IntervalLoop(uint16_t intran, MpingSocket *sock, 
+                              MpingStat *stat);
+
+    // parameters used during running
+    int mustsend;
+    bool start_burst;
+    unsigned int sseq;
+    unsigned int mrseq;
+    size_t cur_packet_size;
+
+    // signal handling
+    static int haltf;
+    static int tick;
+    static bool timedout;
+
+    static void ring(int signo);
+    static void halt(int signo);
+    void InitSigAlarm();
+    void InitSigInt();
 };
 
 #endif  // _MPING_MPING_H_
