@@ -164,7 +164,9 @@ bool MPing::GoProbing(const std::string& dst_addr) {
   if (print_seq_time)
     mystat->ReserveTimeSeqVectors();
 
-  TTLLoop(mysock.get(), mystat);
+  if (!TTLLoop(mysock.get(), mystat)) {
+    return false;
+  }
 
   mystat->PrintStats();
 
@@ -178,7 +180,7 @@ bool MPing::GoProbing(const std::string& dst_addr) {
   return true;
 }
 
-void MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
+bool MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
   ASSERT(sock != NULL);
   ASSERT(stat != NULL);
   int tempttl = 1;
@@ -199,7 +201,10 @@ void MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
     if (inc_ttl > 0)
       MPLOG(MPLOG_TTL, "ttl:%d", tempttl);
 
-    BufferLoop(sock, stat);
+    if (!BufferLoop(sock, stat)) {
+      MPLOG(MPLOG_TTL, "ttl:%d;error", tempttl);
+      return false;
+    }
 
     if (inc_ttl > 0)
       MPLOG(MPLOG_TTL, "ttl:%d;done;From_addr:%s", 
@@ -211,9 +216,11 @@ void MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
 
   if (inc_ttl == 0)
     MPLOG(MPLOG_TTL, "ttl:%d;done", tempttl-1);
+
+  return true;
 }
 
-void MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
+bool MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
   ASSERT(sock != NULL);
   ASSERT(stat != NULL);
 
@@ -260,7 +267,10 @@ void MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
     if (loop_size < 0)
       MPLOG(MPLOG_BUF, "packet_size:%zu", cur_packet_size);
 
-    WindowLoop(sock, stat);
+    if (!WindowLoop(sock, stat)) {
+      MPLOG(MPLOG_BUF, "packet_size:%zu;error", cur_packet_size);
+      return false;
+    }
 
     if (loop_size < 0)
       MPLOG(MPLOG_BUF, "packet_size:%zu;done", cur_packet_size);
@@ -269,9 +279,10 @@ void MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
   if (pkt_size > 0)
     MPLOG(MPLOG_BUF, "packet_size:%zu;done", pkt_size);
   
+  return true;
 }
 
-void MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
+bool MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
   ASSERT(sock != NULL);
   ASSERT(stat != NULL);
   // third loop: window size
@@ -279,7 +290,7 @@ void MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
   // -f w/ other loops: win_size,break
   // -f no other loops: win_size,win_size,...<interrupt>,0,break
   // 0 is to collect all trailing messages still in transit
-  uint16_t intran;  // current window size
+  int intran;  // current window size
   struct timeval now;
 
   if (loop) 
@@ -300,17 +311,15 @@ void MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
       }
     }
 
-    if (intran > 0 && timedout) {
-      mustsend = 1;
-      timedout = false;
-    }
-
     // printing
     if (!loop) {
       MPLOG(MPLOG_WIN, "window_size:%d", intran);
     }
 
-    IntervalLoop(intran, sock, stat);
+    if (!IntervalLoop(intran, sock, stat)) {
+      MPLOG(MPLOG_WIN, "window_size:%d;error", intran);
+      return false;
+    }
 
     if (print_seq_time) {
       gettimeofday(&now, 0);
@@ -322,12 +331,39 @@ void MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
 
   if (loop) 
     MPLOG(MPLOG_WIN, "window_size:%d;done", win_size);
+
+  return true;
 }
 
-void MPing::IntervalLoop(uint16_t intran, MpingSocket *sock, MpingStat *stat) {
+int MPing::GetNeedSend(int _burst, bool _start_burst, bool _slow_start, 
+                unsigned int _sseq, unsigned int _mrseq, int intran,
+                int mustsend) {
+  int diff;
+  int maxopen;
+  int need_send;
+
+  if (_burst ==  0 || !_start_burst) {  // no burst
+    maxopen = _slow_start?2:10;
+    diff = (int)(_sseq - _mrseq - intran);
+    need_send = (diff < 0)?std::min(maxopen, (0-diff)):mustsend;
+  } else {  // start burst, now we have built the window
+    diff = (int)(_sseq - _mrseq + _burst - intran);
+    need_send = (diff > 0)?mustsend:_burst;
+  }
+
+  return need_send;
+}
+
+bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
   ASSERT(sock != NULL);
   ASSERT(stat != NULL);
   struct timeval now;
+  int mustsend = 0;
+
+  if (intran > 0 && timedout) {
+    mustsend = 1;
+    timedout = false;
+  }
   
   if (!tick) {  // sync to system clock
     gettimeofday(&now, 0);
@@ -344,23 +380,15 @@ void MPing::IntervalLoop(uint16_t intran, MpingSocket *sock, MpingStat *stat) {
   int out = 0;  
 #endif        
   while (tick >= now.tv_sec) {
-    int maxopen;
     int rt;
     unsigned int rseq;
     int err;
     bool timeout = false;
-    int diff, need_send;
+    int need_send;
 
-    // send
-    if (burst ==  0 || !start_burst) {  // no burst
-      maxopen = slow_start?2:10;
-      diff = (int)(sseq - mrseq - intran);
-      need_send = (diff < 0)?std::min(maxopen, (0-diff)):mustsend;
-    } else {  // start burst, now we have built the window
-      diff = (int)(sseq - mrseq + burst - intran);
-      need_send = (diff > 0)?mustsend:burst;
-    }
-
+    need_send = GetNeedSend(burst, start_burst, slow_start,
+                            sseq, mrseq, intran, mustsend);
+   
     mustsend = 0;
 
     while (need_send > 0) {
@@ -371,13 +399,15 @@ void MPing::IntervalLoop(uint16_t intran, MpingSocket *sock, MpingStat *stat) {
         if (err != EINTR) { 
           if (err == ENOBUFS) {
             LOG(ERROR, "send buffer run out.");
-            maxopen = 0;
+            need_send = 0;
             sseq--;
           } else {
             if (err != ECONNREFUSED) {  // because we connect on UDP sock
-              LOG(FATAL, "send fails. %s [%d]", strerror(err), err);
+              LOG(ERROR, "send fails. %s [%d]", strerror(err), err);
+              return false;
             } else {
               sseq--;
+              return false;
             }
           }
         }
@@ -418,8 +448,10 @@ void MPing::IntervalLoop(uint16_t intran, MpingSocket *sock, MpingStat *stat) {
       //if (err == EINTR)
        // continue;
      // else
-      if (err != EINTR)
-        LOG(FATAL, "recv fails. %s [%d]", strerror(err), err);
+      if (err != EINTR) {
+        LOG(ERROR, "recv fails. %s [%d]", strerror(err), err);
+        return false;
+      }
     } else {
       gettimeofday(&now, 0);
 
@@ -442,6 +474,8 @@ void MPing::IntervalLoop(uint16_t intran, MpingSocket *sock, MpingStat *stat) {
 #endif
     gettimeofday(&now, 0);
   }  // end of fourth loop: time tick
+
+  return true;
 }
 
 MPing::MPing(const int& argc, const char **argv) :
@@ -462,7 +496,6 @@ MPing::MPing(const int& argc, const char **argv) :
       server_family(SOCKETFAMILY_UNSPEC),
       client_mode(false),
       print_seq_time(false),
-      mustsend(0),
       start_burst(false),
       sseq(0),
       mrseq(0),

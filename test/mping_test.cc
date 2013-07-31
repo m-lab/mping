@@ -17,7 +17,7 @@ namespace {
 }
 
 class MPingUnitTestBase : public MPing {
-  protected:
+  public: 
     MPingUnitTestBase() : MPing(kMyArgc, myargv) { }
 };
 
@@ -70,8 +70,9 @@ class MPingTTLTest : public MPingUnitTestBase {
     }
 
   protected:
-    virtual void BufferLoop(MpingSocket *sock, MpingStat *stat) {
+    virtual bool BufferLoop(MpingSocket *sock, MpingStat *stat) {
       loop_count++;
+      return true;
     }
 };
 
@@ -102,8 +103,9 @@ class MPingBufferLoopTest : public MPingUnitTestBase {
     }
 
   protected:
-    virtual void WindowLoop(MpingSocket *sock, MpingStat *stat) {
+    virtual bool WindowLoop(MpingSocket *sock, MpingStat *stat) {
       size_array.push_back(cur_packet_size);
+      return true;
     }
 };
 
@@ -137,7 +139,7 @@ TEST(MpingUnitTest, BufferLoopTest) {
 class MPingWinLoopTest: public MPingUnitTestBase {
   public:
     int loop_forever_count;
-    std::vector<uint16_t> win_array;
+    std::vector<int> win_array;
 
     MPingWinLoopTest() : MPingUnitTestBase() { }
     void GoTest(bool isloop, int test_inc_ttl, int test_loop_size) {
@@ -154,10 +156,10 @@ class MPingWinLoopTest: public MPingUnitTestBase {
     }
 
   protected:
-    virtual void IntervalLoop(uint16_t intran, MpingSocket *sock, 
+    virtual bool IntervalLoop(int intran, MpingSocket *sock, 
                               MpingStat *stat) {
       if (intran == 0)
-        return;
+        return true;
 
       if (loop && inc_ttl == 0 && loop_size == 0) {
         if (loop_forever_count == 2)
@@ -166,6 +168,7 @@ class MPingWinLoopTest: public MPingUnitTestBase {
           loop_forever_count++;
       }
       win_array.push_back(intran);
+      return true;
     }
 };
 
@@ -188,4 +191,14 @@ TEST(MpingUnitTest, WinLoopTest) {
   EXPECT_EQ(t.win_array.size(), 5u);
   EXPECT_EQ(t.win_array.at(0), 1);
   EXPECT_EQ(t.win_array.at(4), 5);
+}
+
+TEST(MpingUnitTest, GetNeedSendTest) {
+  MPingUnitTestBase t;
+  EXPECT_EQ(t.GetNeedSend(0, false, false, 0, 0, 10, 0), 10);
+  EXPECT_EQ(t.GetNeedSend(0, false, false, 11, 1, 10, 1), 1);
+  EXPECT_EQ(t.GetNeedSend(0, false, true, 0, 0, 10, 0), 2);
+  EXPECT_EQ(t.GetNeedSend(5, true, false, 15, 8, 10, 0), 0);
+  EXPECT_EQ(t.GetNeedSend(5, true, false, 15, 10, 10, 0), 5);
+  EXPECT_EQ(t.GetNeedSend(5, false, false, 15, 8, 10, 0), 3);
 }

@@ -35,6 +35,7 @@ class MPing{
   protected:
     FRIEND_TEST(MpingPacketIO, DynWindow);
     FRIEND_TEST(MpingPacketIO, DynWindowBurst);
+    FRIEND_TEST(MpingUnitTest, GetNeedSendTest);
     // config parameters
     int        win_size;  
     bool       loop;
@@ -60,14 +61,16 @@ class MPing{
 
     void ValidatePara();
     virtual bool GoProbing(const std::string& dst_addr);
-    virtual void TTLLoop(MpingSocket *sock, MpingStat *stat);
-    virtual void BufferLoop(MpingSocket *sock, MpingStat *stat);
-    virtual void WindowLoop(MpingSocket *sock, MpingStat *stat);
-    virtual void IntervalLoop(uint16_t intran, MpingSocket *sock, 
+    virtual bool TTLLoop(MpingSocket *sock, MpingStat *stat);
+    virtual bool BufferLoop(MpingSocket *sock, MpingStat *stat);
+    virtual bool WindowLoop(MpingSocket *sock, MpingStat *stat);
+    virtual bool IntervalLoop(int intran, MpingSocket *sock, 
                               MpingStat *stat);
+    int GetNeedSend(int _burst, bool _start_burst, bool _slow_start,
+                    unsigned int _sseq, unsigned int _mrseq, int intran,
+                    int mustsend);
 
     // parameters used during running
-    int mustsend;
     bool start_burst;
     unsigned int sseq;
     unsigned int mrseq;
