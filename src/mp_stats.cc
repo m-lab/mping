@@ -136,7 +136,7 @@ void MpingStat::PrintTempStats() {
 
 void MpingStat::PrintStats() {
   // check last round losts
-  for (unsigned int i = 0; i < send_queue_size_; i++) {
+  for (unsigned int i = 0; i < send_queue.size(); i++) {
     if (send_queue.at(i).recv_time.tv_sec == 0) {
       lost_num_++;
       lost_num_temp_++;
@@ -152,9 +152,9 @@ void MpingStat::PrintStats() {
 }
 
 void MpingStat::ReserveTimeSeqVectors() {
-  time_of_packets.reserve(sizeof(unsigned long) * kDefaultVectorLength);
-  seq_of_packets.reserve(sizeof(long) * kDefaultVectorLength);
-  interval_boundry.reserve(sizeof(unsigned long) * kDefaultRunTime);
+  time_of_packets.reserve(kDefaultVectorLength);
+  seq_of_packets.reserve(kDefaultVectorLength);
+  interval_boundry.reserve(kDefaultRunTime);
 }
 
 void MpingStat::InsertSequenceTime(int seq, const struct timeval& now) {

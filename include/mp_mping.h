@@ -71,6 +71,7 @@ class MPing{
                     int mustsend);
 
     // parameters used during running
+    struct timeval now;
     bool start_burst;
     unsigned int sseq;
     unsigned int mrseq;
@@ -78,7 +79,7 @@ class MPing{
 
     // signal handling
     static int haltf;
-    static int tick;
+    static long tick;
     static bool timedout;
 
     static void ring(int signo);

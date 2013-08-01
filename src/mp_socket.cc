@@ -440,6 +440,7 @@ unsigned int MpingSocket::ReceiveAndGetSeq(int* error,
 
     if (num_bytes < 0) {
       *error = errno;
+//      LOG(ERROR, "ReceiveAndGetSeq error: %d", errno);
       return 0;
     }
 

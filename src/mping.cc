@@ -13,5 +13,5 @@ int main(int argc, const char** argv) {
     mp.RunClient();
   }
 
-  return 0;
+//  return 0;
 }

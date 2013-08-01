@@ -56,9 +56,8 @@ const int kDefaultTTL = 255;
 // when testing, only send these packets every sec
 const int kMaximumOutPacketsInTest = 20;
 }  // namespace
-
 int MPing::haltf = 0;
-int MPing::tick = 0;
+long MPing::tick = 0;
 bool MPing::timedout = false;
 
 void MPing::ring(int signo) {
@@ -291,7 +290,6 @@ bool MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
   // -f no other loops: win_size,win_size,...<interrupt>,0,break
   // 0 is to collect all trailing messages still in transit
   int intran;  // current window size
-  struct timeval now;
 
   if (loop) 
     MPLOG(MPLOG_WIN, "window_size:%d", win_size);
@@ -357,7 +355,6 @@ int MPing::GetNeedSend(int _burst, bool _start_burst, bool _slow_start,
 bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
   ASSERT(sock != NULL);
   ASSERT(stat != NULL);
-  struct timeval now;
   int mustsend = 0;
 
   if (intran > 0 && timedout) {
@@ -388,6 +385,7 @@ bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
 
     need_send = GetNeedSend(burst, start_burst, slow_start,
                             sseq, mrseq, intran, mustsend);
+//    LOG(INFO, "need_send:%d", need_send);
    
     mustsend = 0;
 

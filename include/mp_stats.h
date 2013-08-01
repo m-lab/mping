@@ -51,7 +51,7 @@ class MpingStat {
     void SetWindowSize(int win_size) {
       window_size_ = win_size;
       send_queue_size_ = 4 * win_size;
-      send_queue.reserve(sizeof(SendQueueNode) * 4 * window_size_);
+      send_queue.reserve(4 * window_size_);
     }
 
     void EnqueueSend(unsigned int seq, struct timeval time);
