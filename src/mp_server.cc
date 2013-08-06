@@ -15,7 +15,79 @@
 #include "mlab/server_socket.h"
 #include "scoped_ptr.h"
 
-MPingServer::MPingServer(size_t packetsize, unsigned short port,
+namespace {
+  char usage[] =
+"Usage:  mping_server [-6] [-b <packet_size>] <port>\n\
+      -6               Listen on IPv6 address\n\
+      -b <packet_size> Set socket buffer size. Use this if you\n\
+                       think your packet will be very large (> 9000 bytes). \n\
+      <port>           Listen port\n";
+}  // namespace
+
+MPingServer::MPingServer(const int& argc, const char **argv) 
+    : have_data(false),
+      unexpected(0),
+      seq_recv(0),
+      sent_back(0),
+      total_recv(0),
+      out_of_order(0),
+      mrseq(0),
+      packet_size(kMinBuffer),
+      server_family(SOCKETFAMILY_IPV4) {
+  int ac = argc;
+  const char **av = argv;
+  const char *p;
+  bool port_set = false;
+  
+  if (argc < 2) {
+    printf("%s", usage);
+    exit(0);
+  }
+
+  ac--;
+  av++;
+
+  while (ac > 0) {
+    p = *av++;
+
+    if (p[0] == '-') {
+      if (ac == 1) {
+        switch (p[1]) {  // those switches without value
+          case '6': server_family = SOCKETFAMILY_IPV6; av--; break;
+          default: LOG(FATAL, "\n%s", usage); break;
+        }
+      } else {
+        switch (p[1]) {
+          case 'b': { pkt_size = atoi(*av); ac--; break; }
+          case '6': { server_family = SOCKETFAMILY_IPV6; av--; break; }
+          default: { 
+            LOG(FATAL, "Unknown parameter -%c\n%s", p[1], usage); break; 
+          }
+        }
+      }
+    } else {  // port
+      if (!port_set) {
+        server_port = atoi(p);  
+        av--;
+        port_set = true;
+      }else{
+        LOG(FATAL, "try to set port %s, but port is already set to %d\n%s", 
+            p, server_port, usage);
+      }
+    }
+
+    ac--;
+    av++;
+  }
+
+  ValidatePara();
+}
+
+void MPingServer::ValidatePara() {
+  
+
+
+MPingServer::Initialzie(size_t packetsize, unsigned short port,
                          SocketFamily family) :
   have_data(false),
   unexpected(0),

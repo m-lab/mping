@@ -528,7 +528,7 @@ MPing::MPing(const int& argc, const char **argv) :
       if (!host_set) {
         dst_host = std::string(p);  
         av--;
-        host_set = 1;
+        host_set = true;
       }else{
         LOG(FATAL, "%s, %s\n%s", p, dst_host.c_str(), usage);
       }

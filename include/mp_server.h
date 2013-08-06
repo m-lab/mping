@@ -6,7 +6,8 @@
 
 class MPingServer {
   public:
-    MPingServer(size_t packetsize, unsigned short port, SocketFamily family);
+    MPingServer(const int& argc, const char **argv); 
+    Initialize(size_t packetsize, unsigned short port, SocketFamily family);
     void Run();
 
   private:
@@ -20,6 +21,8 @@ class MPingServer {
     size_t packet_size;
     unsigned short server_port;
     SocketFamily server_family;
+
+    void ValidatePara();
 };
 
 #endif
