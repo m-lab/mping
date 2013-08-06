@@ -67,7 +67,9 @@ void MPingServer::Run() {
           // TODO(xunfan): erase time out here
           continue;
         }
-      } else {
+      } else if (errno == EINTR) {
+        continue;
+      }else {
         LOG(FATAL, "Receive fails! %s [%d].", strerror(errno), errno);
       }
     }
