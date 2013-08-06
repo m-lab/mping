@@ -27,10 +27,13 @@
 
 class MPing{
   public:
+    size_t     pkt_size;  // packet size in bytes
+    unsigned short  server_port;
+    SocketFamily server_family;
+
     MPing(const int& argc, const char **argv); 
     bool IsServerMode() const;
-    void RunServer();
-    void RunClient();
+    void Run();
 
   protected:
     FRIEND_TEST(MpingPacketIO, DynWindow);
@@ -43,15 +46,12 @@ class MPing{
     bool       slow_start;
     int        ttl;
     int        inc_ttl;  // auto increase TTL to this value
-    size_t     pkt_size;  // packet size in bytes
     int        loop_size;  // -1 to -4
     bool       version;
     bool       debug;
     int        burst;  // burst size
     int        interval;  // undefined now
     int        dport;
-    unsigned short  server_port;
-    SocketFamily server_family;
     bool       client_mode;
     std::string src_addr;
     std::string dst_host;
@@ -61,20 +61,19 @@ class MPing{
 
     void ValidatePara();
     virtual bool GoProbing(const std::string& dst_addr);
-    virtual bool TTLLoop(MpingSocket *sock, MpingStat *stat);
-    virtual bool BufferLoop(MpingSocket *sock, MpingStat *stat);
-    virtual bool WindowLoop(MpingSocket *sock, MpingStat *stat);
-    virtual bool IntervalLoop(int intran, MpingSocket *sock, 
-                              MpingStat *stat);
+    virtual bool TTLLoop(MpingSocket *sock);
+    virtual bool BufferLoop(MpingSocket *sock);
+    virtual bool WindowLoop(MpingSocket *sock);
+    virtual bool IntervalLoop(int intran, MpingSocket *sock);
     int GetNeedSend(int _burst, bool _start_burst, bool _slow_start,
-                    unsigned int _sseq, unsigned int _mrseq, int intran,
+                    uint32_t _sseq, uint32_t _mrseq, int intran,
                     int mustsend);
 
     // parameters used during running
     struct timeval now;
     bool start_burst;
-    unsigned int sseq;
-    unsigned int mrseq;
+    uint32_t sseq;
+    uint32_t mrseq;
     size_t cur_packet_size;
 
     // signal handling

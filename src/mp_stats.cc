@@ -9,7 +9,7 @@
 
 namespace {
 
-unsigned long time_sub(const struct timeval& new_t, 
+uint64_t time_sub(const struct timeval& new_t, 
                        const struct timeval& old_t) {
   struct timeval temp;
 
@@ -28,7 +28,7 @@ const int kDefaultRunTime = 3600;
 
 }  // namespace
 
-void MpingStat::EnqueueSend(unsigned int seq, 
+void MpingStat::EnqueueSend(uint32_t seq, 
                             struct timeval time) {
   SendQueueNode TempNode;
   TempNode.seq = seq;
@@ -51,17 +51,20 @@ void MpingStat::EnqueueSend(unsigned int seq,
     send_queue.at(idx) = TempNode;
   }
   
+  if (print_seq_time) {
+    InsertSequenceTime((int64_t)seq, time);
+  }
 #ifdef MP_TEST
   // timeline
   if (seq > INT_MAX) {
     LOG(FATAL, "send sequence number is too large.");
   } else {
-    timeline.push_back((int)seq);
+    timeline.push_back((int32_t)seq);
   }
 #endif
 }
 
-void MpingStat::EnqueueRecv(unsigned int seq, 
+void MpingStat::EnqueueRecv(uint32_t seq, 
                             struct timeval time) {
   int idx = (seq-1) % send_queue_size_;
 
@@ -89,12 +92,16 @@ void MpingStat::EnqueueRecv(unsigned int seq,
   recv_num_++;
   recv_num_temp_++;
 
+  if (print_seq_time) {
+    InsertSequenceTime((int64_t)(0-seq), time);
+  }
+
   // timeline
 #ifdef MP_TEST
   if (seq > INT_MAX) {
     LOG(FATAL, "recv sequence number is too large.");
   } else {
-    int s = (int)seq;
+    int32_t s = (int32_t)seq;
     timeline.push_back(0 - s);
   }
 #endif
@@ -132,6 +139,12 @@ void MpingStat::PrintTempStats() {
   lost_num_temp_ = 0;
   duplicate_num_temp_ = 0;
   unexpect_num_temp_ = 0;
+
+  if (print_seq_time) {
+    struct timeval t;
+    gettimeofday(&t, 0);
+    InsertIntervalBoundary(t);
+  }
 }
 
 void MpingStat::PrintStats() {
@@ -149,39 +162,42 @@ void MpingStat::PrintStats() {
                    recv_num_, out_of_order_, lost_num_, 
                    lost_num_ * 100.0 / send_num_, duplicate_num_,
                    unexpect_num_);
+
+  if (print_seq_time)
+    PrintResearch();
 }
 
 void MpingStat::ReserveTimeSeqVectors() {
   time_of_packets.reserve(kDefaultVectorLength);
   seq_of_packets.reserve(kDefaultVectorLength);
-  interval_boundry.reserve(kDefaultRunTime);
+  interval_boundary.reserve(kDefaultRunTime);
 }
 
-void MpingStat::InsertSequenceTime(int seq, const struct timeval& now) {
+void MpingStat::InsertSequenceTime(int64_t seq, const struct timeval& now) {
   if (!started) {
     started = true;
     start_time = now;
     time_of_packets.push_back(0);
-    seq_of_packets.push_back((long)seq);
+    seq_of_packets.push_back(seq);
   }
   
   if (started) {
     time_of_packets.push_back(time_sub(now, start_time));
-    seq_of_packets.push_back((long)seq);
+    seq_of_packets.push_back(seq);
   }
 }
 
-void MpingStat::InsertIntervalBoundry(const struct timeval& now) {
-  interval_boundry.push_back(time_sub(now, start_time));
+void MpingStat::InsertIntervalBoundary(const struct timeval& now) {
+  interval_boundary.push_back(time_sub(now, start_time));
 }
 
 void MpingStat::PrintResearch() const {
-  for (unsigned int i = 0; i < time_of_packets.size(); i++) {
+  for (size_t i = 0; i < time_of_packets.size(); i++) {
     MPLOG(MPLOG_DEF, "[Research seq-time];%ld;%lu", 
           seq_of_packets.at(i), time_of_packets.at(i));
   }
 
-  for (unsigned int j = 0; j < interval_boundry.size(); j++) {
-    MPLOG(MPLOG_DEF, "[Research interval-switch];%lu", interval_boundry.at(j));
+  for (size_t j = 0; j < interval_boundary.size(); j++) {
+    MPLOG(MPLOG_DEF, "[Research interval-switch];%lu", interval_boundary.at(j));
   }
 }

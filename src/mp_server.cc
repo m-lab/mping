@@ -24,7 +24,7 @@ MPingServer::MPingServer(size_t packetsize, unsigned short port,
   total_recv(0),
   out_of_order(0),
   mrseq(0),
-  packet_size(std::max(packetsize, kMaxBuffer)),
+  packet_size(std::max(packetsize, kMinBuffer)),
   server_port(port),
   server_family(family) { }
 
@@ -64,6 +64,7 @@ void MPingServer::Run() {
                        ";total unexpected=" << unexpected << std::endl;
           have_data = false;
         } else {
+          // TODO(xunfan): erase time out here
           continue;
         }
       } else {
@@ -80,7 +81,7 @@ void MPingServer::Run() {
     }
 
     std::string head(recv_packet.buffer(), kPayloadHeaderLength);
-    if (head.compare(kPayloadHeader) != 0){
+    if (head != kPayloadHeader){
       LOG(VERBOSE, "recv a packet not for this program.");
       unexpected++;
       continue;

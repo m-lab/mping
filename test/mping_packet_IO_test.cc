@@ -16,7 +16,7 @@ TEST(MpingPacketIO, DynWindow) {
   MPing mp(6, myargv);
   EXPECT_FALSE(mp.IsServerMode());
 
-  mp.RunClient(); 
+  mp.Run(); 
 
   // loop on window size from 1 to 15, every window has 20 packet to send
   // 1, -1, ..., 20, -20, 21, 22, -21, ..., 40, -39, 41, 42, -40 
@@ -46,7 +46,7 @@ TEST(MpingPacketIO, DynWindowBurst) {
                           "-B", "3", NULL};
 
   MPing mp(8, myargv);
-  mp.RunClient();
+  mp.Run();
 
   // ..., 41, 42, -40, -41, -42, 43, 44, 45, ..., 58, 59, 60, -58, -59, 61, 
   // 62, 63, -60, -61, -62, ...

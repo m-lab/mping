@@ -5,6 +5,6 @@
 
 extern const char *kPayloadHeader;
 extern const int kPayloadHeaderLength;
-extern const size_t kMaxBuffer;
+extern const size_t kMinBuffer;
 
 #endif

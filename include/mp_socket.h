@@ -40,8 +40,8 @@ class MpingSocket {
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const unsigned int& seq, size_t size, int *error) const;
-    unsigned int ReceiveAndGetSeq(int* error, MpingStat *mpstat);
+    size_t SendPacket(const uint32_t& seq, size_t size, int *error) const;
+    uint32_t ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
 
   protected:

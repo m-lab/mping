@@ -19,7 +19,7 @@
 #include <sys/time.h>
 
 struct SendQueueNode {
-  unsigned int seq;
+  uint32_t seq;
   struct timeval send_time;
   struct timeval recv_time;
 //  unsigned int num_pkt_in_net;  // number of packet in flight when sent
@@ -45,31 +45,41 @@ class MpingStat {
       lost_num_temp_(0),
       window_size_(0),
       send_queue_size_(0),
-      started(false) { 
+      started(false),
+      print_seq_time(false) { 
     }
 
-    void SetWindowSize(int win_size) {
+    void Initialize(int win_size, bool print_seqtime) {
       window_size_ = win_size;
+
+      // Delay larger than 4 RTT is deemed as packet drop.
       send_queue_size_ = 4 * win_size;
       send_queue.reserve(4 * window_size_);
+
+      if (print_seqtime) {
+        print_seq_time = true;
+        ReserveTimeSeqVectors();
+      }
     }
 
-    void EnqueueSend(unsigned int seq, struct timeval time);
-    void EnqueueRecv(unsigned int seq, struct timeval time); 
+    void EnqueueSend(uint32_t seq, struct timeval time);
+    void EnqueueRecv(uint32_t seq, struct timeval time); 
     void LogUnexpected();
 
     void PrintStats();
     void PrintTempStats();
     void PrintTimeLine() const;
 
-    std::vector<int> timeline;
-    std::vector<unsigned long> time_of_packets;  // relative time to start_time
-    std::vector<long> seq_of_packets;
+    std::vector<int32_t> timeline;
+    std::vector<uint64_t> time_of_packets;  // relative time 
+                                                      // to start_time in usec
+    std::vector<int64_t> seq_of_packets;
 
     void ReserveTimeSeqVectors();
-    void InsertSequenceTime(int seq, const struct timeval& now);
-    void InsertIntervalBoundry(const struct timeval& now);
+    void InsertSequenceTime(int64_t seq, const struct timeval& now);
+    void InsertIntervalBoundary(const struct timeval& now);
     void PrintResearch() const;
+    
   protected:
     unsigned int unexpect_num_;
     unsigned int unexpect_num_temp_;
@@ -92,9 +102,9 @@ class MpingStat {
 
   private:
     bool started;
+    bool print_seq_time;
     struct timeval start_time;
-
-    std::vector<unsigned long> interval_boundry;
+    std::vector<uint64_t> interval_boundary;
 };
 
 #endif

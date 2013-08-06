@@ -7,16 +7,16 @@
 #include <iostream>
 #include <set>
 
-#include "mp_common.h"
-#include "mp_mping.h"
-#include "mp_server.h"
-#include "mp_log.h"
-#include "scoped_ptr.h"
 #include "mlab/socket_family.h"
 #include "mlab/host.h"
 #include "mlab/mlab.h"
 #include "mlab/protocol_header.h"
 #include "mlab/server_socket.h"
+#include "mp_common.h"
+#include "mp_log.h"
+#include "mp_mping.h"
+#include "mp_server.h"
+#include "scoped_ptr.h"
 
 namespace {
   char usage[] = 
@@ -50,7 +50,7 @@ namespace {
       <host>     Target host\n";
 
 const int kNbTab[] = {64, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
-const char *kVersion = "mping version: 2.0 (2013.06)";
+const char *kVersion = "mping version: 2.1 2013.08)";
 const int kDefaultTTL = 255;
 
 // when testing, only send these packets every sec
@@ -109,12 +109,7 @@ void MPing::InitSigInt() {
   }
 }
 
-void MPing::RunServer() {
-  MPingServer server(pkt_size, server_port, server_family);
-  server.Run();
-}
-
-void MPing::RunClient() {
+void MPing::Run() {
   if (dest_ips.empty()) {
     LOG(ERROR, "No target address.");
     return;
@@ -148,7 +143,7 @@ bool MPing::GoProbing(const std::string& dst_addr) {
   sseq = 0;
   mrseq = 0;
 
-  maxsize = std::max(pkt_size, kMaxBuffer);
+  maxsize = std::max(pkt_size, kMinBuffer);
 
   scoped_ptr<MpingSocket> mysock(new MpingSocket);
 
@@ -157,20 +152,13 @@ bool MPing::GoProbing(const std::string& dst_addr) {
     return false;
   }
 
-  MpingStat *mystat = &mp_stat;                                                    
-  mystat->SetWindowSize(win_size);
+  mp_stat.Initialize(win_size, print_seq_time);
 
-  if (print_seq_time)
-    mystat->ReserveTimeSeqVectors();
-
-  if (!TTLLoop(mysock.get(), mystat)) {
+  if (!TTLLoop(mysock.get())) {
     return false;
   }
 
-  mystat->PrintStats();
-
-  if (print_seq_time)
-    mystat->PrintResearch();
+  mp_stat.PrintStats();
 
 // #ifdef MP_TEST
 //   mystat->PrintTimeLine();
@@ -179,9 +167,9 @@ bool MPing::GoProbing(const std::string& dst_addr) {
   return true;
 }
 
-bool MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
+bool MPing::TTLLoop(MpingSocket *sock) {
   ASSERT(sock != NULL);
-  ASSERT(stat != NULL);
+
   int tempttl = 1;
 
   if (inc_ttl == 0) {
@@ -200,7 +188,7 @@ bool MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
     if (inc_ttl > 0)
       MPLOG(MPLOG_TTL, "ttl:%d", tempttl);
 
-    if (!BufferLoop(sock, stat)) {
+    if (!BufferLoop(sock)) {
       MPLOG(MPLOG_TTL, "ttl:%d;error", tempttl);
       return false;
     }
@@ -219,16 +207,13 @@ bool MPing::TTLLoop(MpingSocket *sock, MpingStat *stat) {
   return true;
 }
 
-bool MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
+bool MPing::BufferLoop(MpingSocket *sock) {
   ASSERT(sock != NULL);
-  ASSERT(stat != NULL);
-
-  int nbix = 0;
 
   if (pkt_size > 0)
     MPLOG(MPLOG_BUF, "packet_size:%zu", pkt_size);
 
-  for (nbix = 0; ; nbix++) {
+  for (int nbix = 0; ; nbix++) {
     if (haltf)
       break;
 
@@ -266,7 +251,7 @@ bool MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
     if (loop_size < 0)
       MPLOG(MPLOG_BUF, "packet_size:%zu", cur_packet_size);
 
-    if (!WindowLoop(sock, stat)) {
+    if (!WindowLoop(sock)) {
       MPLOG(MPLOG_BUF, "packet_size:%zu;error", cur_packet_size);
       return false;
     }
@@ -281,9 +266,8 @@ bool MPing::BufferLoop(MpingSocket *sock, MpingStat *stat) {
   return true;
 }
 
-bool MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
+bool MPing::WindowLoop(MpingSocket *sock) {
   ASSERT(sock != NULL);
-  ASSERT(stat != NULL);
   // third loop: window size
   // no -f flag:        1,2,3,....,win_size,0,break
   // -f w/ other loops: win_size,break
@@ -314,17 +298,12 @@ bool MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
       MPLOG(MPLOG_WIN, "window_size:%d", intran);
     }
 
-    if (!IntervalLoop(intran, sock, stat)) {
+    if (!IntervalLoop(intran, sock)) {
       MPLOG(MPLOG_WIN, "window_size:%d;error", intran);
       return false;
     }
 
-    if (print_seq_time) {
-      gettimeofday(&now, 0);
-      stat->InsertIntervalBoundry(now);
-    }
-
-    stat->PrintTempStats();
+    mp_stat.PrintTempStats();
   }
 
   if (loop) 
@@ -334,7 +313,7 @@ bool MPing::WindowLoop(MpingSocket *sock, MpingStat *stat) {
 }
 
 int MPing::GetNeedSend(int _burst, bool _start_burst, bool _slow_start, 
-                unsigned int _sseq, unsigned int _mrseq, int intran,
+                uint32_t _sseq, uint32_t _mrseq, int intran,
                 int mustsend) {
   int diff;
   int maxopen;
@@ -352,9 +331,9 @@ int MPing::GetNeedSend(int _burst, bool _start_burst, bool _slow_start,
   return need_send;
 }
 
-bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
+bool MPing::IntervalLoop(int intran, MpingSocket *sock) {
   ASSERT(sock != NULL);
-  ASSERT(stat != NULL);
+
   int mustsend = 0;
 
   if (intran > 0 && timedout) {
@@ -416,10 +395,7 @@ bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
       } else {  // send success, update counters
         gettimeofday(&now, 0);
         
-        if (print_seq_time)
-          stat->InsertSequenceTime(sseq, now);
-
-        stat->EnqueueSend(sseq, now);
+        mp_stat.EnqueueSend(sseq, now);
 #ifdef MP_TEST              
         out++;
 #endif              
@@ -441,7 +417,7 @@ bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
     }
     
     // recv
-    rseq = sock->ReceiveAndGetSeq(&err, stat);
+    rseq = sock->ReceiveAndGetSeq(&err, &mp_stat);
     if (err != 0) {
       //if (err == EINTR)
        // continue;
@@ -453,12 +429,9 @@ bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
     } else {
       gettimeofday(&now, 0);
 
-      if (print_seq_time)
-        stat->InsertSequenceTime(0-rseq, now);
+      mp_stat.EnqueueRecv(rseq, now);
 
-      stat->EnqueueRecv(rseq, now);
-
-      if ((int)(sseq - rseq) < 0) {
+      if (sseq < rseq) {
         LOG(ERROR, "recv a seq larger than sent %d %d %d",
             mrseq, rseq, sseq);
       } else {
@@ -477,21 +450,21 @@ bool MPing::IntervalLoop(int intran, MpingSocket *sock, MpingStat *stat) {
 }
 
 MPing::MPing(const int& argc, const char **argv) :
+      pkt_size(0),                                                              
+      server_port(0),
+      server_family(SOCKETFAMILY_UNSPEC),
       win_size(4),                                                              
       loop(false),                                                              
       rate(0),                                                                  
       slow_start(false),                                                        
       ttl(0),                                                                   
       inc_ttl(0),                                                               
-      pkt_size(0),                                                              
       loop_size(0),                                                             
       version(false),                                                           
       debug(false),                                                             
       burst(0),                                                                 
       interval(0),
       dport(0),
-      server_port(0),
-      server_family(SOCKETFAMILY_UNSPEC),
       client_mode(false),
       print_seq_time(false),
       start_burst(false),

@@ -299,7 +299,7 @@ MpingSocket::~MpingSocket() {
   udp_sock = NULL;
 }
 
-size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size, 
+size_t MpingSocket::SendPacket(const uint32_t& seq, size_t size, 
                                int *error) const {
   char buf[size];
   size_t send_size = 0;
@@ -357,7 +357,7 @@ size_t MpingSocket::SendPacket(const unsigned int& seq, size_t size,
   }
 }
 
-unsigned int MpingSocket::ReceiveAndGetSeq(int* error, 
+uint32_t MpingSocket::ReceiveAndGetSeq(int* error, 
                                            MpingStat *mpstat) {
   if (client_mode_) {
     ASSERT(udp_sock != NULL);
@@ -386,13 +386,13 @@ unsigned int MpingSocket::ReceiveAndGetSeq(int* error,
         should_recv_size = 2 * sizeof(mlab::IP4Header) + 
                            sizeof(mlab::ICMP4Header) +
                            sizeof(mlab::UDPHeader) +
-                           buffer_length_ + sizeof(unsigned int);
+                           buffer_length_ + sizeof(uint32_t);
         payload_offset = payload_offset +
                          sizeof(mlab::IP4Header) + sizeof(mlab::UDPHeader);
       } else {
         // recv_size = size;
         should_recv_size = sizeof(mlab::IP4Header) + buffer_length_ + 
-                      sizeof(unsigned int);
+                      sizeof(uint32_t);
       }
 
       break;
@@ -403,12 +403,12 @@ unsigned int MpingSocket::ReceiveAndGetSeq(int* error,
         should_recv_size = sizeof(mlab::ICMP6Header) + 
                            sizeof(mlab::IP6Header) +
                            sizeof(mlab::UDPHeader) +
-                           buffer_length_ + sizeof(unsigned int);
+                           buffer_length_ + sizeof(uint32_t);
         payload_offset = payload_offset + 
                          sizeof(mlab::IP6Header) + sizeof(mlab::UDPHeader);
       } else {
         // recv_size = size - sizeof(mlab::IP6Header);
-        should_recv_size = buffer_length_ + sizeof(unsigned int);
+        should_recv_size = buffer_length_ + sizeof(uint32_t);
       }
 
       min_recv_size = sizeof(mlab::ICMP6Header);
@@ -419,7 +419,7 @@ unsigned int MpingSocket::ReceiveAndGetSeq(int* error,
   }
 
   if (client_mode_) {
-    should_recv_size = buffer_length_ + sizeof(unsigned int);
+    should_recv_size = buffer_length_ + sizeof(uint32_t);
     payload_offset = 0;
   }
 
@@ -525,7 +525,7 @@ unsigned int MpingSocket::ReceiveAndGetSeq(int* error,
       fromaddr_ = recvfromaddr.original_hostname;
 
     ptr += kPayloadHeaderLength;
-    const unsigned int *seq = reinterpret_cast<const unsigned int*>(ptr);
+    const uint32_t *seq = reinterpret_cast<const uint32_t*>(ptr);
     *error = 0;
     return ntohl(*seq);
   }
