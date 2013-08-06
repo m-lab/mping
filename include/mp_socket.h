@@ -14,16 +14,15 @@
 
 #ifndef _MP_SOCKET_H_
 #define _MP_SOCKET_H_
+#include "string.h"
 
 #include "mlab/client_socket.h"
 #include "mlab/socket_family.h"
 #include "mlab/raw_socket.h"
 #include "mp_stats.h"
-#include "log.h"
 
 class MpingSocket {
   public:
-    
     MpingSocket() :
       icmp_sock(NULL),
       udp_sock(NULL),
@@ -41,8 +40,8 @@ class MpingSocket {
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const unsigned int& seq, size_t size, int *error) const;
-    unsigned int ReceiveAndGetSeq(int* error, MpingStat *mpstat);
+    size_t SendPacket(const uint32_t& seq, size_t size, int *error) const;
+    uint32_t ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
 
   protected:

@@ -16,10 +16,10 @@
 #define _MPING_STATS_H_
 
 #include <vector>
-#include <time.h>
+#include <sys/time.h>
 
 struct SendQueueNode {
-  unsigned int seq;
+  uint32_t seq;
   struct timeval send_time;
   struct timeval recv_time;
 //  unsigned int num_pkt_in_net;  // number of packet in flight when sent
@@ -27,7 +27,7 @@ struct SendQueueNode {
 
 class MpingStat {
   public:
-    MpingStat(const int& win_size) : 
+    MpingStat() : 
       unexpect_num_(0),
       unexpect_num_temp_(0),
       max_recv_seq_(1),
@@ -43,19 +43,43 @@ class MpingStat {
       duplicate_num_temp_(0),
       lost_num_(0),
       lost_num_temp_(0),
-      window_size_(win_size),
-      send_queue_size_(4 * win_size) { 
-      send_queue.reserve(sizeof(SendQueueNode) * 4 * window_size_);
+      window_size_(0),
+      send_queue_size_(0),
+      started(false),
+      print_seq_time(false) { 
     }
 
-    void EnqueueSend(unsigned int seq, struct timeval time);
-    void EnqueueRecv(unsigned int seq, struct timeval time); 
+    void Initialize(int win_size, bool print_seqtime) {
+      window_size_ = win_size;
+
+      // Delay larger than 4 RTT is deemed as packet drop.
+      send_queue_size_ = 4 * win_size;
+      send_queue.reserve(4 * window_size_);
+
+      if (print_seqtime) {
+        print_seq_time = true;
+        ReserveTimeSeqVectors();
+      }
+    }
+
+    void EnqueueSend(uint32_t seq, struct timeval time);
+    void EnqueueRecv(uint32_t seq, struct timeval time); 
     void LogUnexpected();
 
     void PrintStats();
     void PrintTempStats();
     void PrintTimeLine() const;
 
+    std::vector<int32_t> timeline;
+    std::vector<uint64_t> time_of_packets;  // relative time 
+                                                      // to start_time in usec
+    std::vector<int64_t> seq_of_packets;
+
+    void ReserveTimeSeqVectors();
+    void InsertSequenceTime(int64_t seq, const struct timeval& now);
+    void InsertIntervalBoundary(const struct timeval& now);
+    void PrintResearch() const;
+    
   protected:
     unsigned int unexpect_num_;
     unsigned int unexpect_num_temp_;
@@ -75,7 +99,12 @@ class MpingStat {
     int window_size_;
     unsigned int send_queue_size_;
     std::vector<struct SendQueueNode> send_queue;
-    std::vector<int> timeline;
+
+  private:
+    bool started;
+    bool print_seq_time;
+    struct timeval start_time;
+    std::vector<uint64_t> interval_boundary;
 };
 
 #endif
