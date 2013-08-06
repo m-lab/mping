@@ -61,29 +61,6 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
       LOG(FATAL, "unknow destination address family.");
   }
 
-//  // handle sourceip
-//  if (srcip.length() != 0) {
-//    srcaddr_.ss_family = 
-//        AddressFamilyFor(mlab::RawSocket::GetAddrFamily(srcip));
-//
-//    if (mlab::RawSocket::GetAddrFamily(srcip) != family_) {
-//      return -1;
-//    }
-//
-//    switch (srcaddr_.ss_family) {
-//      case AF_INET: {
-//        sockaddr_in *in = reinterpret_cast<sockaddr_in *>(&srcaddr_);
-//        inet_pton(srcaddr_.ss_family, srcip.c_str(), &(in->sin_addr));
-//        break;
-//      }
-//      case AF_INET6: {
-//        sockaddr_in6 *in6 = reinterpret_cast<sockaddr_in6 *>(&srcaddr_);
-//        inet_pton(srcaddr_.ss_family, srcip.c_str(), &(in6->sin6_addr));
-//        break;
-//      }
-//    }
-//  }
-
   fromaddr_ = destip;
 
   // create sockets and initialize buffer
@@ -170,58 +147,6 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
     if (udp_sock == NULL) {
       return -1;
     }
-
-//    // bind UDP socket to a src ip with port 0 (kernel will choose random port)
-//    if (srcip.length() != 0) {
-//      sockaddr_storage sa, da;
-//      socklen_t size;
-//      switch (srcaddr_.ss_family) {
-//        case AF_INET: {
-//          sockaddr_in *in = reinterpret_cast<sockaddr_in*>(&da);
-//          in->sin_family = AF_INET;
-//          in->sin_port = htons(dport);
-//          inet_pton(in->sin_family, destip.c_str(), &(in->sin_addr));
-//          size = sizeof(sockaddr_in);
-//          break;
-//        }
-//        case AF_INET6: {
-//          sockaddr_in6 *in6 = reinterpret_cast<sockaddr_in6*>(&da);
-//          in6->sin6_family = AF_INET6;
-//          in6->sin6_port = htons(dport);
-//          inet_pton(in6->sin6_family, destip.c_str(), &(in6->sin6_addr));
-//          size = sizeof(sockaddr_in6);
-//          break;
-//        }
-//      }
-//
-//      // un connect the socket to unbind it, otherwise the bind will fail
-//      sa.ss_family = AF_UNSPEC;
-//      if (connect(udp_sock->raw(), reinterpret_cast<const sockaddr*>(&sa),
-//                  size) < 0) {
-//        LOG(ERROR, "un-connect UDP socket fails. %s [%d]", 
-//            strerror(errno), errno);
-//        return -1;
-//      }
-//
-//      // bind to send from specified address, 
-//      // source address is stored in srcaddr_
-//      if (bind(udp_sock->raw(), 
-//               reinterpret_cast<const sockaddr*>(&srcaddr_), size) < 0) {
-//        LOG(ERROR, 
-//            "Bind UDP socket to source address %s fails. %s [%d]", 
-//            srcip.c_str(), strerror(errno), errno);
-//        return -1;
-//      }
-//
-//      // re-connect to destip
-//      if (connect(udp_sock->raw(), reinterpret_cast<const sockaddr*>(&da),
-//            size) < 0) {
-//        LOG(ERROR, "re-connect UDP socket fails. %s [%d]", 
-//            strerror(errno), errno);
-//        return -1;
-//      }
-//      
-//    }
 
     if (!clientmode) {
       // icmp to recv

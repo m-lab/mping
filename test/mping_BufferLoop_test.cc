@@ -48,22 +48,22 @@ TEST(MpingUnitTest, BufferLoopTest) {
   EXPECT_EQ(t.size_array.size(), 1u);
   EXPECT_EQ(t.size_array.at(0), 256u);
 
-  t.GoTest(0, -1);
+  t.GoTest(0, 1);
   EXPECT_EQ(t.size_array.size(), 8u);
   EXPECT_EQ(t.size_array.at(0), 64u);
   EXPECT_EQ(t.size_array.at(7), 4000u);
 
-  t.GoTest(0, -2);
+  t.GoTest(0, 2);
   EXPECT_EQ(t.size_array.size(), 23u);  // max 1500, 1500/64=23
   EXPECT_EQ(t.size_array.at(0), 64u);
   EXPECT_EQ(t.size_array.at(22), 1472u);  // 64 * 23 = 1472
   
-  t.GoTest(0, -3);
+  t.GoTest(0, 3);
   EXPECT_EQ(t.size_array.size(), 16u);  // max 2048, 2048/128=16
   EXPECT_EQ(t.size_array.at(0), 128u);
   EXPECT_EQ(t.size_array.at(15), 2048u);  // 128 * 16 = 2048
 
-  t.GoTest(0, -4);
+  t.GoTest(0, 4);
   EXPECT_EQ(t.size_array.size(), 17u);  // max 4500, 4500/256=17
   EXPECT_EQ(t.size_array.at(0), 256u);
   EXPECT_EQ(t.size_array.at(16), 4352u);  // 256 * 17 = 4352

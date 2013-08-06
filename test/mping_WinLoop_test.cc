@@ -63,7 +63,7 @@ TEST(MpingUnitTest, WinLoopTest) {
   EXPECT_EQ(t.win_array.size(), 1u);
   EXPECT_EQ(t.win_array.at(0), 5);
 
-  t.GoTest(true, 0, -2);
+  t.GoTest(true, 0, 2);
   EXPECT_EQ(t.win_array.size(), 1u);
   EXPECT_EQ(t.win_array.at(0), 5);
 

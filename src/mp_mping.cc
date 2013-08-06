@@ -30,8 +30,8 @@ namespace {
       -a <ttlmax> Auto-increment TTL up to ttlmax.  Forces -t\n\
 \n\
       -b <len>    Message length in bytes, including IP header, etc\n\
-      -b -<sel>   Loop through message sizes: -1:selected sizes\n\
-                  or steps of: -2:64 -3:128 -4:256\n\
+      -l <sel>   Loop through message sizes: 1:selected sizes\n\
+                  or steps of: 2:64 3:128 4:256\n\
       -B <bnum>   Send <bnum> packets in burst, should smaller than <num>\n\
       -p <port>   If UDP, destination port number\n\
 \n\
@@ -222,22 +222,22 @@ bool MPing::BufferLoop(MpingSocket *sock) {
       if (nbix != 0) 
         break;
     } else {  // set packet size: increase packet size
-      if (loop_size == -1) {
+      if (loop_size == 1) {
         if (kNbTab[nbix] == 0) 
           break;
 
         cur_packet_size = kNbTab[nbix];
-      } else if (loop_size == -2) {
+      } else if (loop_size == 2) {
         if ((nbix+1)*64 > 1500)
           break;
 
         cur_packet_size = (nbix+1)*64;
-      } else if (loop_size == -3) {
+      } else if (loop_size == 3) {
         if ((nbix+1)*128 > 2048)
           break;
 
         cur_packet_size = (nbix+1)*128;
-      } else if (loop_size == -4) {
+      } else if (loop_size == 4) {
         if ((nbix+1)*256 > 4500)
           break;
 
@@ -248,7 +248,7 @@ bool MPing::BufferLoop(MpingSocket *sock) {
       }
     }  // end of set packet size
 
-    if (loop_size < 0)
+    if (loop_size > 0)
       MPLOG(MPLOG_BUF, "packet_size:%zu", cur_packet_size);
 
     if (!WindowLoop(sock)) {
@@ -256,7 +256,7 @@ bool MPing::BufferLoop(MpingSocket *sock) {
       return false;
     }
 
-    if (loop_size < 0)
+    if (loop_size > 0)
       MPLOG(MPLOG_BUF, "packet_size:%zu;done", cur_packet_size);
   }
 
@@ -284,7 +284,7 @@ bool MPing::WindowLoop(MpingSocket *sock) {
 
     if (intran > win_size) {
       if (loop) {
-        if (inc_ttl > 0 || loop_size < 0)
+        if (inc_ttl > 0 || loop_size > 0)
           break;
         else
           intran = win_size;
@@ -508,17 +508,8 @@ MPing::MPing(const int& argc, const char **argv) :
           case 't': { ttl = atoi(*av); ac--; break; }
           case 's': { server_port = atoi(*av); ac--; break; }
           case 'a': { inc_ttl = atoi(*av); ttl = inc_ttl; ac--; break; }
-          case 'b': {
-            p = *av;
-            if (p[0] == '-') {
-              loop_size = atoi(*av);  
-            } else {
-              pkt_size = atoi(*av);
-            }
-
-            ac--;
-            break; 
-          }
+          case 'b': { pkt_size = atoi(*av); ac--; break; }
+          case 'l': { loop_size = atoi(*av); ac--; break; }
           case 'p': { dport = atoi(*av); ac--; break; }
           case 'B': { burst = atoi(*av); ac--; break; }
           case 'V': { version = true; av--; break; }
@@ -603,10 +594,10 @@ void MPing::ValidatePara() {
                        "now set TTL to 255.", ttl);
   } 
 
-  // loop_size [-4, -1]
-  if (loop_size < -4 || loop_size > 0) {
+  // loop_size [1, 4]
+  if (loop_size > 4 || loop_size < 0) {
     LOG(FATAL, "loop through message size could only take"
-                     "-1, -2, -3 or -4");
+                     "1, 2, 3 or 4");
   }
 
   // inc_ttl
