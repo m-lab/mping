@@ -15,7 +15,7 @@
 #include "mlab/server_socket.h"
 #include "scoped_ptr.h"
 
-MPingServer::MPingServer(size_t packetsize, unsigned short port,
+MPingServer::MPingServer(size_t packetsize, uint16_t port,
                          SocketFamily family) :
   have_data(false),
   unexpected(0),

@@ -6,7 +6,7 @@
 
 class MPingServer {
   public:
-    MPingServer(size_t packetsize, unsigned short port, SocketFamily family);
+    MPingServer(size_t packetsize, uint16_t port, SocketFamily family);
     void Run();
 
   private:
@@ -18,7 +18,7 @@ class MPingServer {
     int out_of_order;
     unsigned int mrseq;
     size_t packet_size;
-    unsigned short server_port;
+    uint16_t server_port;
     SocketFamily server_family;
 };
 

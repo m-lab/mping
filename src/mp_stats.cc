@@ -52,7 +52,8 @@ void MpingStat::EnqueueSend(uint32_t seq,
   }
   
   if (print_seq_time) {
-    InsertSequenceTime((int64_t)seq, time);
+    int64_t tseq = (int64_t)seq;
+    InsertSequenceTime(tseq, time);
   }
 #ifdef MP_TEST
   // timeline
@@ -93,7 +94,8 @@ void MpingStat::EnqueueRecv(uint32_t seq,
   recv_num_temp_++;
 
   if (print_seq_time) {
-    InsertSequenceTime((int64_t)(0-seq), time);
+    int64_t tseq = (int64_t)seq; 
+    InsertSequenceTime((0-tseq), time);
   }
 
   // timeline

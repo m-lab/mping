@@ -10,8 +10,7 @@ const int kTestStatsSize = 10;
 
 class MpingStatsTest : public MpingStat {
   public:
-    MpingStatsTest() : MpingStat() {
-      Initialize(kTestStatsSize, false);
+    MpingStatsTest() : MpingStat(kTestStatsSize, false) {
     }
 
     void TestSend(unsigned int* in1, unsigned int* in2) {

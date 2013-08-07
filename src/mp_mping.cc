@@ -50,7 +50,7 @@ namespace {
       <host>     Target host\n";
 
 const int kNbTab[] = {64, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
-const char *kVersion = "mping version: 2.1 2013.08)";
+const char *kVersion = "mping version: 2.1 (2013.08)";
 const int kDefaultTTL = 255;
 
 // when testing, only send these packets every sec
@@ -151,8 +151,6 @@ bool MPing::GoProbing(const std::string& dst_addr) {
                          maxsize, win_size, dport, client_mode) < 0) {
     return false;
   }
-
-  mp_stat.Initialize(win_size, print_seq_time);
 
   if (!TTLLoop(mysock.get())) {
     return false;
@@ -467,6 +465,7 @@ MPing::MPing(const int& argc, const char **argv) :
       dport(0),
       client_mode(false),
       print_seq_time(false),
+      mp_stat(win_size, print_seq_time),
       start_burst(false),
       sseq(0),
       mrseq(0),
@@ -556,10 +555,6 @@ void MPing::ValidatePara() {
 
   // server mode
   if (server_port > 0) {
-    if (server_port > 65535) {
-      LOG(FATAL, "Server port cannot larger than 65535.");
-    }
-    
     if (server_family == SOCKETFAMILY_UNSPEC){
       LOG(FATAL, "Need to know the socket family, use -4 or -6.");
     }
