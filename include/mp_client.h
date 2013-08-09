@@ -15,24 +15,24 @@
 #ifndef _MPING_MPING_H_
 #define _MPING_MPING_H_
 
+#include "mlab/socket_family.h"
+#include "mp_socket.h"
+#include "mp_stats.h"
+
 #include <stdint.h>
 #include <set>
 #include <string>
 
-#include "mp_socket.h"
-#include "mp_stats.h"
-#include "mlab/socket_family.h"
-
 //#define MP_PRINT_TIMELINE
 
-class MPing{
+class MPingClient{
   public:
     size_t     pkt_size;  // packet size in bytes
-    unsigned short  server_port;
-    SocketFamily server_family;
+//    uint16_t  server_port;
+//    SocketFamily server_family;
 
-    MPing(const int& argc, const char **argv); 
-    bool IsServerMode() const;
+    MPingClient(const int& argc, const char **argv); 
+//    bool IsServerMode() const;
     void Run();
 
   protected:
@@ -56,8 +56,8 @@ class MPing{
     std::string src_addr;
     std::string dst_host;
     std::set<std::string> dest_ips;
-    MpingStat  mp_stat;
     bool       print_seq_time;
+    MpingStat  mp_stat;
 
     void ValidatePara();
     virtual bool GoProbing(const std::string& dst_addr);

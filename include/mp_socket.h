@@ -14,7 +14,7 @@
 
 #ifndef _MP_SOCKET_H_
 #define _MP_SOCKET_H_
-#include "string.h"
+#include <string.h>
 
 #include "mlab/client_socket.h"
 #include "mlab/socket_family.h"

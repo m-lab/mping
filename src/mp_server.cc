@@ -58,7 +58,7 @@ MPingServer::MPingServer(const int& argc, const char **argv)
         }
       } else {
         switch (p[1]) {
-          case 'b': { pkt_size = atoi(*av); ac--; break; }
+          case 'b': { packet_size = atoi(*av); ac--; break; }
           case '6': { server_family = SOCKETFAMILY_IPV6; av--; break; }
           default: { 
             LOG(FATAL, "Unknown parameter -%c\n%s", p[1], usage); break; 
@@ -80,28 +80,11 @@ MPingServer::MPingServer(const int& argc, const char **argv)
     av++;
   }
 
-  ValidatePara();
+  packet_size = std::max(packet_size, kMinBuffer);
 }
 
-void MPingServer::ValidatePara() {
-  
-
-
-MPingServer::Initialzie(size_t packetsize, unsigned short port,
-                         SocketFamily family) :
-  have_data(false),
-  unexpected(0),
-  seq_recv(0),
-  sent_back(0),
-  total_recv(0),
-  out_of_order(0),
-  mrseq(0),
-  packet_size(std::max(packetsize, kMinBuffer)),
-  server_port(port),
-  server_family(family) { }
-
 void MPingServer::Run() {
-  LOG(INFO, "Running server mode, port %u.", server_port);
+  MPLOG(MPLOG_DEF, "Running server mode, port %u.", server_port);
 
   // create server socket
   scoped_ptr<mlab::ServerSocket>
@@ -148,7 +131,7 @@ void MPingServer::Run() {
 
     total_recv++;
 
-    if (recv_packet.length() < (kPayloadHeaderLength + sizeof(unsigned int))) {
+    if (recv_packet.length() < (kPayloadHeaderLength + sizeof(uint32_t))) {
       LOG(VERBOSE, "recv a packet smaller than min size.");
       unexpected++;
       continue;

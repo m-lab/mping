@@ -1,13 +1,13 @@
 #ifndef _MPING_SERVER_H_
 #define _MPING_SERVER_H_
 
-#include "string.h"
+#include <stdint.h>
+#include <string.h>
 #include "mlab/socket_family.h"
 
 class MPingServer {
   public:
     MPingServer(const int& argc, const char **argv); 
-    Initialize(size_t packetsize, unsigned short port, SocketFamily family);
     void Run();
 
   private:
@@ -19,10 +19,8 @@ class MPingServer {
     int out_of_order;
     unsigned int mrseq;
     size_t packet_size;
-    unsigned short server_port;
+    uint16_t server_port;
     SocketFamily server_family;
-
-    void ValidatePara();
 };
 
 #endif

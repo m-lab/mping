@@ -2,9 +2,17 @@
 #define _MPING_COMMON_H_
 
 #include <string.h>
+#include <stdint.h>
 
-extern const char *kPayloadHeader;
-extern const int kPayloadHeaderLength;
+typedef uint64_t MPSEQTYPE;
+
+extern const char* kPayloadHeader;
+extern const size_t kPayloadHeaderLength;
+
+extern const char *kStrHeader;
+extern const size_t kStrHeaderLength;
+extern const size_t kStartOfSeq;
+extern const size_t kAllHeaderLen;
 extern const size_t kMinBuffer;
 
 #endif

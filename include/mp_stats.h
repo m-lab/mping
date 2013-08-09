@@ -16,6 +16,8 @@
 #define _MPING_STATS_H_
 
 #include <vector>
+
+#include <stdint.h>
 #include <sys/time.h>
 
 struct SendQueueNode {
@@ -27,37 +29,29 @@ struct SendQueueNode {
 
 class MpingStat {
   public:
-    MpingStat() : 
-      unexpect_num_(0),
-      unexpect_num_temp_(0),
-      max_recv_seq_(1),
-      out_of_order_(0),
-      out_of_order_temp_(0),
-      recv_num_(0),
-      recv_num_temp_(0),
-      recv_unique_num_(0),
-      recv_unique_num_temp_(0),
-      send_num_(0),
-      send_num_temp_(0),
-      duplicate_num_(0),
-      duplicate_num_temp_(0),
-      lost_num_(0),
-      lost_num_temp_(0),
-      window_size_(0),
-      send_queue_size_(0),
-      started(false),
-      print_seq_time(false) { 
-    }
+    MpingStat(int win_size, bool print_sequence_time)
+      : unexpect_num_(0),
+        unexpect_num_temp_(0),
+        max_recv_seq_(1),
+        out_of_order_(0),
+        out_of_order_temp_(0),
+        recv_num_(0),
+        recv_num_temp_(0),
+        recv_unique_num_(0),
+        recv_unique_num_temp_(0),
+        send_num_(0),
+        send_num_temp_(0),
+        duplicate_num_(0),
+        duplicate_num_temp_(0),
+        lost_num_(0),
+        lost_num_temp_(0),
+        window_size_(0),
+        send_queue_size_(4 * win_size), // Delay > 4 RTT means packet drop.
+        started(false),
+        print_seq_time(print_sequence_time) { 
+      send_queue.reserve(send_queue_size_);
 
-    void Initialize(int win_size, bool print_seqtime) {
-      window_size_ = win_size;
-
-      // Delay larger than 4 RTT is deemed as packet drop.
-      send_queue_size_ = 4 * win_size;
-      send_queue.reserve(4 * window_size_);
-
-      if (print_seqtime) {
-        print_seq_time = true;
+      if (print_seq_time) {
         ReserveTimeSeqVectors();
       }
     }
@@ -72,7 +66,7 @@ class MpingStat {
 
     std::vector<int32_t> timeline;
     std::vector<uint64_t> time_of_packets;  // relative time 
-                                                      // to start_time in usec
+                                            // to start_time in usec
     std::vector<int64_t> seq_of_packets;
 
     void ReserveTimeSeqVectors();
