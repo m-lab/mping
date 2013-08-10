@@ -7,8 +7,8 @@
 #include <errno.h>
 #include <string.h>
 
-#include "mp_log.h"
 #include "mp_common.h"
+#include "mp_log.h"
 #include "mp_socket.h"
 #include "mlab/mlab.h"
 #include "mlab/protocol_header.h"
@@ -40,8 +40,8 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
   // check packet size
   switch (family_) {
     case SOCKETFAMILY_IPV4: {
-      min_size = sizeof(mlab::IP4Header) + kPayloadHeaderLength +
-                 sizeof(unsigned int) + sizeof(mlab::ICMP4Header);
+      min_size = sizeof(mlab::IP4Header) + kAllHeaderLen +
+                 sizeof(mlab::ICMP4Header);
       if (pktsize < min_size)
         LOG(FATAL, "Packet size should be no less than %zu for IPv4.",
             min_size);
@@ -49,8 +49,8 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
       break;
     }
     case SOCKETFAMILY_IPV6: {
-      min_size = sizeof(mlab::IP6Header) + kPayloadHeaderLength +
-                 sizeof(unsigned int) + sizeof(mlab::ICMP6Header);
+      min_size = sizeof(mlab::IP6Header) + kAllHeaderLen +
+                 sizeof(mlab::ICMP6Header);
       if (pktsize < min_size)
         LOG(FATAL, "Packet size should be no less than %zu for IPv6.",
             min_size);
@@ -93,20 +93,19 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
       case SOCKETFAMILY_IPV4: {
         scoped_ptr<mlab::ICMP4Header> icmphdr(new mlab::ICMP4Header(ICMP_ECHO, 
                                                                     0, 0, 0));
-        // TODO: add get buffer method to protocol headers
         memcpy(buffer_, icmphdr.get(), sizeof(mlab::ICMP4Header));
-        memcpy(buffer_ + sizeof(mlab::ICMP4Header), kPayloadHeader,
-               kPayloadHeaderLength);
-        buffer_length_ = sizeof(mlab::ICMP4Header) + kPayloadHeaderLength;
+        memcpy(buffer_ + sizeof(mlab::ICMP4Header), kStrHeader,
+               kStrHeaderLength);
+        buffer_length_ = sizeof(mlab::ICMP4Header) + kStrHeaderLength;
         break;
       }
       case SOCKETFAMILY_IPV6: {
         scoped_ptr<mlab::ICMP6Header> icmp6hdr(new mlab::ICMP6Header(128, 0,
                                                                      0, 0));
         memcpy(buffer_, icmp6hdr.get(), sizeof(mlab::ICMP6Header));
-        memcpy(buffer_ + sizeof(mlab::ICMP6Header), kPayloadHeader, 
-               kPayloadHeaderLength);
-        buffer_length_ = sizeof(mlab::ICMP6Header) + kPayloadHeaderLength;
+        memcpy(buffer_ + sizeof(mlab::ICMP6Header), kStrHeader, 
+               kStrHeaderLength);
+        buffer_length_ = sizeof(mlab::ICMP6Header) + kStrHeaderLength;
         break;
       }
       case SOCKETFAMILY_UNSPEC: {
@@ -174,8 +173,8 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
     }
 
     // build packet
-    memcpy(buffer_, kPayloadHeader, kPayloadHeaderLength);
-    buffer_length_ = kPayloadHeaderLength;
+    memcpy(buffer_, kStrHeader, kStrHeaderLength);
+    buffer_length_ = kStrHeaderLength;
   }
 
   return 0;
@@ -224,17 +223,17 @@ MpingSocket::~MpingSocket() {
   udp_sock = NULL;
 }
 
-size_t MpingSocket::SendPacket(const uint32_t& seq, size_t size, 
+size_t MpingSocket::SendPacket(const MPSEQTYPE& seq, size_t size, 
                                int *error) const {
   char buf[size];
   size_t send_size = 0;
-  unsigned int* seq_ptr;
+  uint64_t* seq_ptr;
 
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
 
   switch (family_) {
     case SOCKETFAMILY_IPV4: {
-      if (size < sizeof(mlab::IP4Header) + buffer_length_ + sizeof(seq)) {
+      if (size < sizeof(mlab::IP4Header) + buffer_length_ + 2 * sizeof(seq)) {
         LOG(FATAL, "send packet size is smaller than MIN.");
       }
       send_size = size - sizeof(mlab::IP4Header); 
@@ -244,7 +243,7 @@ size_t MpingSocket::SendPacket(const uint32_t& seq, size_t size,
       break;
     }
     case SOCKETFAMILY_IPV6: {
-      if (size < sizeof(mlab::IP6Header) + buffer_length_ + sizeof(seq)) {
+      if (size < sizeof(mlab::IP6Header) + buffer_length_ + 2 * sizeof(seq)) {
         LOG(FATAL, "send packet size is smaller than MIN.");
       }
       send_size = size - sizeof(mlab::IP6Header);
@@ -257,13 +256,23 @@ size_t MpingSocket::SendPacket(const uint32_t& seq, size_t size,
   }
 
   memcpy(buf, buffer_, buffer_length_);
-  seq_ptr = reinterpret_cast<unsigned int*>(buf + buffer_length_);
-  *seq_ptr = htonl(seq);
-  
+
+  seq_ptr = reinterpret_cast<uint64_t*>(buf + buffer_length_);
+  *seq_ptr = MPhton64(seq, is_big_end);
+
+  // padding with ~seq to keep checksum constant
+  seq_ptr = reinterpret_cast<uint64_t*>(buf + buffer_length_ +
+                                        sizeof(MPSEQTYPE));
+  *seq_ptr = MPhton64(~seq, is_big_end);
+
   ssize_t num_bytes = 0;
   // TODO(xunfan): use protocol enum so that adding TCP is trivial
   if (!use_udp_) {  // ICMP
     ASSERT(icmp_sock != NULL);
+    // bzero rest of the buffer
+    bzero(buf + buffer_length_ + 2 * sizeof(MPSEQTYPE),
+          send_size - buffer_length_ - 2 * sizeof(MPSEQTYPE));
+
     if (family_ == SOCKETFAMILY_IPV4) {
       // set checksum
       mlab::ICMP4Header *p = reinterpret_cast<mlab::ICMP4Header *>(buf);
@@ -275,6 +284,12 @@ size_t MpingSocket::SendPacket(const uint32_t& seq, size_t size,
     return static_cast<size_t>(num_bytes);
   } else {  // UDP
     ASSERT(udp_sock != NULL);
+
+    if (!client_mode_) {
+      bzero(buf + buffer_length_ + 2 * sizeof(MPSEQTYPE), 
+            send_size - buffer_length_ - 2 * sizeof(MPSEQTYPE));
+    }
+
     if (!udp_sock->Send(mlab::Packet(buf, send_size), &num_bytes)) {
       *error = errno;
     }
@@ -282,8 +297,8 @@ size_t MpingSocket::SendPacket(const uint32_t& seq, size_t size,
   }
 }
 
-uint32_t MpingSocket::ReceiveAndGetSeq(int* error, 
-                                           MpingStat *mpstat) {
+MPSEQTYPE MpingSocket::ReceiveAndGetSeq(int* error, 
+                                        MpingStat *mpstat) {
   if (client_mode_) {
     ASSERT(udp_sock != NULL);
   } else {
@@ -311,13 +326,13 @@ uint32_t MpingSocket::ReceiveAndGetSeq(int* error,
         should_recv_size = 2 * sizeof(mlab::IP4Header) + 
                            sizeof(mlab::ICMP4Header) +
                            sizeof(mlab::UDPHeader) +
-                           buffer_length_ + sizeof(uint32_t);
+                           buffer_length_ + 2 * sizeof(MPSEQTYPE);
         payload_offset = payload_offset +
                          sizeof(mlab::IP4Header) + sizeof(mlab::UDPHeader);
       } else {
         // recv_size = size;
         should_recv_size = sizeof(mlab::IP4Header) + buffer_length_ + 
-                      sizeof(uint32_t);
+                           2 * sizeof(MPSEQTYPE);
       }
 
       break;
@@ -328,12 +343,12 @@ uint32_t MpingSocket::ReceiveAndGetSeq(int* error,
         should_recv_size = sizeof(mlab::ICMP6Header) + 
                            sizeof(mlab::IP6Header) +
                            sizeof(mlab::UDPHeader) +
-                           buffer_length_ + sizeof(uint32_t);
+                           buffer_length_ + 2 * sizeof(MPSEQTYPE);
         payload_offset = payload_offset + 
                          sizeof(mlab::IP6Header) + sizeof(mlab::UDPHeader);
       } else {
         // recv_size = size - sizeof(mlab::IP6Header);
-        should_recv_size = buffer_length_ + sizeof(uint32_t);
+        should_recv_size = buffer_length_ + 2 * sizeof(MPSEQTYPE);
       }
 
       min_recv_size = sizeof(mlab::ICMP6Header);
@@ -344,7 +359,7 @@ uint32_t MpingSocket::ReceiveAndGetSeq(int* error,
   }
 
   if (client_mode_) {
-    should_recv_size = buffer_length_ + sizeof(uint32_t);
+    should_recv_size = buffer_length_ + 2 * sizeof(MPSEQTYPE);
     payload_offset = 0;
   }
 
@@ -352,7 +367,7 @@ uint32_t MpingSocket::ReceiveAndGetSeq(int* error,
   ssize_t num_bytes = 0;
   mlab::Host recvfromaddr("127.0.0.1");
   while (1) {
-    mlab::Packet recv_packet(""); 
+    mlab::Packet recv_packet("");
     if (client_mode_) {
       recv_packet = udp_sock->Receive(should_recv_size, &num_bytes);
     } else {
@@ -439,8 +454,8 @@ uint32_t MpingSocket::ReceiveAndGetSeq(int* error,
 
     // check payload
     ptr += payload_offset;  // now ptr is at the beginning of the payload
-    std::string head(ptr, kPayloadHeaderLength);
-    if (head.compare(kPayloadHeader) != 0) {
+    std::string head(ptr, kStrHeaderLength);
+    if (head.compare(kStrHeader) != 0) {
       LOG(VERBOSE, "recv an packet not for this program.");
       mpstat->LogUnexpected();
       continue;
@@ -449,10 +464,10 @@ uint32_t MpingSocket::ReceiveAndGetSeq(int* error,
     if (use_udp_)
       fromaddr_ = recvfromaddr.original_hostname;
 
-    ptr += kPayloadHeaderLength;
-    const uint32_t *seq = reinterpret_cast<const uint32_t*>(ptr);
+    ptr += kStrHeaderLength;
+    const MPSEQTYPE *seq = reinterpret_cast<const MPSEQTYPE*>(ptr);
     *error = 0;
-    return ntohl(*seq);
+    return MPntoh64(*seq, is_big_end);
   }
 }
 

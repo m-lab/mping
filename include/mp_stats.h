@@ -17,11 +17,12 @@
 
 #include <vector>
 
-#include <stdint.h>
 #include <sys/time.h>
 
+#include "mp_common.h"
+
 struct SendQueueNode {
-  uint32_t seq;
+  MPSEQTYPE seq;
   struct timeval send_time;
   struct timeval recv_time;
 //  unsigned int num_pkt_in_net;  // number of packet in flight when sent
@@ -56,42 +57,42 @@ class MpingStat {
       }
     }
 
-    void EnqueueSend(uint32_t seq, struct timeval time);
-    void EnqueueRecv(uint32_t seq, struct timeval time); 
+    void EnqueueSend(MPSEQTYPE seq, struct timeval time);
+    void EnqueueRecv(MPSEQTYPE seq, struct timeval time); 
     void LogUnexpected();
 
     void PrintStats();
     void PrintTempStats();
     void PrintTimeLine() const;
 
-    std::vector<int32_t> timeline;
+    std::vector<MPSEQTYPE> timeline;
     std::vector<uint64_t> time_of_packets;  // relative time 
                                             // to start_time in usec
-    std::vector<int64_t> seq_of_packets;
+    std::vector<MPSEQTYPE> seq_of_packets;
 
     void ReserveTimeSeqVectors();
-    void InsertSequenceTime(int64_t seq, const struct timeval& now);
+    void InsertSequenceTime(MPSEQTYPE seq, const struct timeval& now);
     void InsertIntervalBoundary(const struct timeval& now);
     void PrintResearch() const;
     
   protected:
-    unsigned int unexpect_num_;
-    unsigned int unexpect_num_temp_;
-    unsigned int max_recv_seq_;
-    unsigned int out_of_order_;
-    unsigned int out_of_order_temp_;
-    unsigned int recv_num_;
-    unsigned int recv_num_temp_;
-    unsigned int recv_unique_num_;
-    unsigned int recv_unique_num_temp_;
-    unsigned int send_num_;
-    unsigned int send_num_temp_;
-    unsigned int duplicate_num_;
-    unsigned int duplicate_num_temp_;
-    unsigned int lost_num_;
-    unsigned int lost_num_temp_;
+    int64_t unexpect_num_;
+    int64_t unexpect_num_temp_;
+    int64_t max_recv_seq_;
+    int64_t out_of_order_;
+    int64_t out_of_order_temp_;
+    int64_t recv_num_;
+    int64_t recv_num_temp_;
+    int64_t recv_unique_num_;
+    int64_t recv_unique_num_temp_;
+    int64_t send_num_;
+    int64_t send_num_temp_;
+    int64_t duplicate_num_;
+    int64_t duplicate_num_temp_;
+    int64_t lost_num_;
+    int64_t lost_num_temp_;
     int window_size_;
-    unsigned int send_queue_size_;
+    int send_queue_size_;
     std::vector<struct SendQueueNode> send_queue;
 
   private:

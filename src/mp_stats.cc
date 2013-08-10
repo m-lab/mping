@@ -9,7 +9,7 @@
 namespace {
 
 uint64_t time_sub(const struct timeval& new_t, 
-                       const struct timeval& old_t) {
+                  const struct timeval& old_t) {
   struct timeval temp;
 
   temp.tv_usec = new_t.tv_usec - old_t.tv_usec;
@@ -27,7 +27,7 @@ const int kDefaultRunTime = 3600;
 
 }  // namespace
 
-void MpingStat::EnqueueSend(uint32_t seq, 
+void MpingStat::EnqueueSend(MPSEQTYPE seq, 
                             struct timeval time) {
   SendQueueNode TempNode;
   TempNode.seq = seq;
@@ -51,20 +51,15 @@ void MpingStat::EnqueueSend(uint32_t seq,
   }
   
   if (print_seq_time) {
-    int64_t tseq = (int64_t)seq;
-    InsertSequenceTime(tseq, time);
+    InsertSequenceTime(seq, time);
   }
 #ifdef MP_TEST
   // timeline
-  if (seq > INT_MAX) {
-    LOG(FATAL, "send sequence number is too large.");
-  } else {
-    timeline.push_back((int32_t)seq);
-  }
+  timeline.push_back(seq);
 #endif
 }
 
-void MpingStat::EnqueueRecv(uint32_t seq, 
+void MpingStat::EnqueueRecv(MPSEQTYPE seq, 
                             struct timeval time) {
   int idx = (seq-1) % send_queue_size_;
 
@@ -93,18 +88,12 @@ void MpingStat::EnqueueRecv(uint32_t seq,
   recv_num_temp_++;
 
   if (print_seq_time) {
-    int64_t tseq = (int64_t)seq; 
-    InsertSequenceTime((0-tseq), time);
+    InsertSequenceTime((0-seq), time);
   }
 
   // timeline
 #ifdef MP_TEST
-  if (seq > INT_MAX) {
-    LOG(FATAL, "recv sequence number is too large.");
-  } else {
-    int32_t s = (int32_t)seq;
-    timeline.push_back(0 - s);
-  }
+  timeline.push_back(0 - seq);
 #endif
 }
 
@@ -128,8 +117,10 @@ void MpingStat::PrintTimeLine() const {
 }
 
 void MpingStat::PrintTempStats() {
-  MPLOG(MPLOG_WIN, "sent:%u;received:%u;total received:%u;out-of-order:%u;"
-                   "lost:%u;dup:%u;unexpected:%u", send_num_temp_,
+  MPLOG(MPLOG_WIN, "sent:%" PRId64 ";received:%" PRId64 ";"
+                   "total received:%" PRId64 ";out-of-order:%" PRId64 ";"
+                   "lost:%" PRId64 ";dup:%" PRId64 ";"
+                   "unexpected:%" PRId64 "", send_num_temp_,
                    recv_unique_num_temp_, recv_num_temp_, out_of_order_temp_,
                    lost_num_temp_, duplicate_num_temp_, unexpect_num_temp_);
 
@@ -150,16 +141,18 @@ void MpingStat::PrintTempStats() {
 
 void MpingStat::PrintStats() {
   // check last round losts
-  for (unsigned int i = 0; i < send_queue.size(); i++) {
+  for (size_t i = 0; i < send_queue.size(); i++) {
     if (send_queue.at(i).recv_time.tv_sec == 0) {
       lost_num_++;
       lost_num_temp_++;
     }
   }
 
-  MPLOG(MPLOG_DEF, "total_sent:%u;received:%u;total_received:%u;"
-                   "total_out-of-order:%u;total_lost:%u:%f%%;total_dup:%u;"
-                   "total_unexpected:%u", send_num_, recv_unique_num_,
+  MPLOG(MPLOG_DEF, "total_sent:%" PRId64 ";received:%" PRId64 ";"
+                   "total_received:%" PRId64 ";"
+                   "total_out-of-order:%" PRId64 ";total_lost:%" PRId64 ":%f%%;"
+                   "total_dup:%" PRId64 ";"
+                   "total_unexpected:%" PRId64 "", send_num_, recv_unique_num_,
                    recv_num_, out_of_order_, lost_num_, 
                    lost_num_ * 100.0 / send_num_, duplicate_num_,
                    unexpect_num_);
@@ -174,7 +167,7 @@ void MpingStat::ReserveTimeSeqVectors() {
   interval_boundary.reserve(kDefaultRunTime);
 }
 
-void MpingStat::InsertSequenceTime(int64_t seq, const struct timeval& now) {
+void MpingStat::InsertSequenceTime(MPSEQTYPE seq, const struct timeval& now) {
   if (!started) {
     started = true;
     start_time = now;

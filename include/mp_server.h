@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "mlab/socket_family.h"
+#include "mp_common.h"
 
 class MPingServer {
   public:
@@ -12,12 +13,12 @@ class MPingServer {
 
   private:
     bool have_data;
-    int unexpected;
-    int seq_recv;
-    int sent_back;
-    int total_recv;
-    int out_of_order;
-    unsigned int mrseq;
+    int64_t unexpected;
+    int64_t seq_recv;
+    int64_t sent_back;
+    int64_t total_recv;
+    int64_t out_of_order;
+    MPSEQTYPE mrseq;
     size_t packet_size;
     uint16_t server_port;
     SocketFamily server_family;

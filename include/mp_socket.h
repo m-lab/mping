@@ -19,6 +19,7 @@
 #include "mlab/client_socket.h"
 #include "mlab/socket_family.h"
 #include "mlab/raw_socket.h"
+#include "mp_common.h"
 #include "mp_stats.h"
 
 class MpingSocket {
@@ -29,7 +30,8 @@ class MpingSocket {
       family_(SOCKETFAMILY_UNSPEC),
       buffer_length_(0),
       use_udp_(false),
-      client_mode_(false) {
+      client_mode_(false),
+      is_big_end(IsBigEndian()) {
         memset(&srcaddr_, 0, sizeof(srcaddr_));
         memset(buffer_, 0, sizeof(buffer_));
       }
@@ -40,8 +42,8 @@ class MpingSocket {
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const uint32_t& seq, size_t size, int *error) const;
-    uint32_t ReceiveAndGetSeq(int* error, MpingStat *mpstat);
+    size_t SendPacket(const MPSEQTYPE& seq, size_t size, int *error) const;
+    MPSEQTYPE ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
 
   protected:
@@ -59,6 +61,7 @@ class MpingSocket {
     bool use_udp_;
     bool client_mode_;
     std::string fromaddr_;
+    bool is_big_end;
 };
 
 #endif

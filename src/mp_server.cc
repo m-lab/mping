@@ -9,7 +9,6 @@
 #include <iostream>
 
 #include "mp_log.h"
-#include "mp_common.h"
 #include "mp_server.h"
 #include "mlab/mlab.h"
 #include "mlab/server_socket.h"
@@ -131,14 +130,14 @@ void MPingServer::Run() {
 
     total_recv++;
 
-    if (recv_packet.length() < (kPayloadHeaderLength + sizeof(uint32_t))) {
+    if (recv_packet.length() < (kStrHeaderLength + 2 * sizeof(MPSEQTYPE))) {
       LOG(VERBOSE, "recv a packet smaller than min size.");
       unexpected++;
       continue;
     }
 
-    std::string head(recv_packet.buffer(), kPayloadHeaderLength);
-    if (head != kPayloadHeader){
+    std::string head(recv_packet.buffer(), kStrHeaderLength);
+    if (head != kStrHeader){
       LOG(VERBOSE, "recv a packet not for this program.");
       unexpected++;
       continue;
@@ -146,11 +145,11 @@ void MPingServer::Run() {
 
     have_data = true;
     seq_recv++;
-    const unsigned int *seq = 
-        reinterpret_cast<const unsigned int*>(recv_packet.buffer() +
-                                              kPayloadHeaderLength);
+    const MPSEQTYPE *seq = 
+        reinterpret_cast<const MPSEQTYPE*>(recv_packet.buffer() +
+                                              kStrHeaderLength);
 
-    unsigned int rseq = ntohl(*seq);
+    MPSEQTYPE rseq = ntohl(*seq);
     if (mrseq > rseq) {
       out_of_order++;
     } else {

@@ -46,7 +46,7 @@ class MPingClient{
     bool       slow_start;
     int        ttl;
     int        inc_ttl;  // auto increase TTL to this value
-    int        loop_size;  // -1 to -4
+    int        loop_size;  // 1 to 4
     bool       version;
     bool       debug;
     int        burst;  // burst size
@@ -66,14 +66,14 @@ class MPingClient{
     virtual bool WindowLoop(MpingSocket *sock);
     virtual bool IntervalLoop(int intran, MpingSocket *sock);
     int GetNeedSend(int _burst, bool _start_burst, bool _slow_start,
-                    uint32_t _sseq, uint32_t _mrseq, int intran,
+                    int64_t _sseq, int64_t _mrseq, int intran,
                     int mustsend);
 
     // parameters used during running
     struct timeval now;
     bool start_burst;
-    uint32_t sseq;
-    uint32_t mrseq;
+    int64_t sseq;
+    int64_t mrseq;
     size_t cur_packet_size;
 
     // signal handling

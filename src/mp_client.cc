@@ -128,10 +128,6 @@ void MPingClient::Run() {
   }
 }
 
-//bool MPingClient::IsServerMode() const {
-//  return (server_port > 0);
-//}
-
 bool MPingClient::GoProbing(const std::string& dst_addr) {
   size_t maxsize;
   start_burst = false;  // set true when win_size > burst size
@@ -153,10 +149,6 @@ bool MPingClient::GoProbing(const std::string& dst_addr) {
   }
 
   mp_stat.PrintStats();
-
-// #ifdef MP_TEST
-//   mystat->PrintTimeLine();
-// #endif
 
   return true;
 }
@@ -307,7 +299,7 @@ bool MPingClient::WindowLoop(MpingSocket *sock) {
 }
 
 int MPingClient::GetNeedSend(int _burst, bool _start_burst, bool _slow_start, 
-                uint32_t _sseq, uint32_t _mrseq, int intran,
+                int64_t _sseq, int64_t _mrseq, int intran,
                 int mustsend) {
   int diff;
   int maxopen;
@@ -351,7 +343,7 @@ bool MPingClient::IntervalLoop(int intran, MpingSocket *sock) {
 #endif        
   while (tick >= now.tv_sec) {
     int rt;
-    unsigned int rseq;
+    int64_t rseq;
     int err;
     bool timeout = false;
     int need_send;
@@ -426,7 +418,8 @@ bool MPingClient::IntervalLoop(int intran, MpingSocket *sock) {
       mp_stat.EnqueueRecv(rseq, now);
 
       if (sseq < rseq) {
-        LOG(ERROR, "recv a seq larger than sent %d %d %d",
+        LOG(ERROR, "recv a seq larger than sent %" PRId64 ""
+                   "%" PRId64 " %" PRId64 "",
             mrseq, rseq, sseq);
       } else {
         mrseq = rseq;
