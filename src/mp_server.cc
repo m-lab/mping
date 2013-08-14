@@ -251,11 +251,11 @@ void *MPingServer::UDPThread(void *that) {
 
     statenode->total_recv++;
 
-    const MPSEQTYPE *pseq = 
-        reinterpret_cast<const MPSEQTYPE*>(recv_packet.buffer() +
+    const int64_t *pseq = 
+        reinterpret_cast<const int64_t*>(recv_packet.buffer() +
                                            kSequenceOffset);
 
-    MPSEQTYPE rseq = MPntoh64(*pseq, is_big_end);
+    int64_t rseq = MPntoh64(*pseq, is_big_end);
     statenode->sequence_recv++;
 
     if (statenode->max_recv_seq > rseq) {

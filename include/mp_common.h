@@ -14,8 +14,6 @@
 
 #include "mp_log.h"
 
-typedef int64_t MPSEQTYPE;
-
 extern const int kDefaultTTL;
 
 extern const char *kStrHeader;

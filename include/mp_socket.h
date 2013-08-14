@@ -43,9 +43,9 @@ class MpingSocket {
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const MPSEQTYPE& seq, uint16_t client_cookie,
+    size_t SendPacket(const int64_t& seq, uint16_t client_cookie,
                       size_t size, int *error) const;
-    MPSEQTYPE ReceiveAndGetSeq(int* error, MpingStat *mpstat);
+    int64_t ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
 
     // TCP communication with server end

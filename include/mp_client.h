@@ -40,6 +40,20 @@ class MPingClient{
     FRIEND_TEST(MpingPacketIO, DynWindowBurst);
     FRIEND_TEST(MpingUnitTest, GetNeedSendTest);
 
+    virtual bool GoProbing(const std::string& dst_addr);
+    virtual bool TTLLoop(MpingSocket* sock);
+    virtual bool BufferLoop(MpingSocket* sock);
+    virtual bool WindowLoop(MpingSocket* sock);
+    virtual bool IntervalLoop(int intran, MpingSocket* sock);
+    int GetNeedSend(int burst, bool start_burst, bool slow_start,
+                int64_t sseq, int64_t mrseq, int intran,
+                int mustsend) const;
+
+    static void ring(int signo);
+    static void halt(int signo);
+    void InitSigAlarm();
+    void InitSigInt();
+
     // config parameters
     size_t     pkt_size_;  // packet size in bytes
     int        win_size_;  
@@ -66,24 +80,10 @@ class MPingClient{
     int64_t mrseq_;
     size_t cur_packet_size_;
 
-    virtual bool GoProbing(const std::string& dst_addr);
-    virtual bool TTLLoop(MpingSocket* sock);
-    virtual bool BufferLoop(MpingSocket* sock);
-    virtual bool WindowLoop(MpingSocket* sock);
-    virtual bool IntervalLoop(int intran, MpingSocket* sock);
-    int GetNeedSend(int burst, bool start_burst, bool slow_start,
-                    int64_t sseq, int64_t mrseq, int intran,
-                    int mustsend) const;
-
     // signal handling
     static int haltf_;
     static long tick_;
     static bool timedout_;
-
-    static void ring(int signo);
-    static void halt(int signo);
-    void InitSigAlarm();
-    void InitSigInt();
 };
 
 #endif  // _MPING_MPING_H_

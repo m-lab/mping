@@ -27,7 +27,7 @@ const int kDefaultRunTime = 3600;
 
 }  // namespace
 
-void MpingStat::EnqueueSend(MPSEQTYPE seq, 
+void MpingStat::EnqueueSend(int64_t seq, 
                             struct timeval time) {
   SendQueueNode TempNode;
   TempNode.seq = seq;
@@ -59,7 +59,7 @@ void MpingStat::EnqueueSend(MPSEQTYPE seq,
 #endif
 }
 
-void MpingStat::EnqueueRecv(MPSEQTYPE seq, 
+void MpingStat::EnqueueRecv(int64_t seq, 
                             struct timeval time) {
   int idx = (seq-1) % send_queue_size_;
 
@@ -167,7 +167,7 @@ void MpingStat::ReserveTimeSeqVectors() {
   interval_boundary.reserve(kDefaultRunTime);
 }
 
-void MpingStat::InsertSequenceTime(MPSEQTYPE seq, const struct timeval& now) {
+void MpingStat::InsertSequenceTime(int64_t seq, const struct timeval& now) {
   if (!started) {
     started = true;
     start_time = now;

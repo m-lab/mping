@@ -19,7 +19,7 @@ struct ClientStateNode {
   uint64_t sent_back;
   uint64_t out_of_order;
   uint64_t unexpected;
-  MPSEQTYPE max_recv_seq;
+  int64_t max_recv_seq;
   ServerEchoMode echo_mode;
   struct timeval start_time;
   struct timeval last_recv_time;
@@ -43,13 +43,6 @@ class MPingServer {
     void Run();
 
   private:
-    size_t packet_size_;
-    uint16_t server_port_;
-    SocketFamily server_family_;
-    std::vector<std::pair<uint16_t, ClientStateNode*> > client_map_;
-    pthread_mutex_t MuxClientMap_;
-    pthread_mutex_t MuxLog_;
-
     static void *TCPThread(void *that);
     static void *UDPThread(void *that);
     static void *CleanupThread(void *that);
@@ -59,6 +52,14 @@ class MPingServer {
     void DeleteClient(uint16_t client_cookie);
     void InsertClient(uint16_t client_cookie, ClientStateNode *node);
     void PrintClientStats(ClientStateNode *node) const;
+
+    size_t packet_size_;
+    uint16_t server_port_;
+    SocketFamily server_family_;
+    std::vector<std::pair<uint16_t, ClientStateNode*> > client_map_;
+    pthread_mutex_t MuxClientMap_;
+    pthread_mutex_t MuxLog_;
+
 };
 
 #endif

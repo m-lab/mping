@@ -22,7 +22,7 @@
 #include "mp_common.h"
 
 struct SendQueueNode {
-  MPSEQTYPE seq;
+  int64_t seq;
   struct timeval send_time;
   struct timeval recv_time;
 //  unsigned int num_pkt_in_net;  // number of packet in flight when sent
@@ -57,18 +57,18 @@ class MpingStat {
       }
     }
 
-    void EnqueueSend(MPSEQTYPE seq, struct timeval time);
-    void EnqueueRecv(MPSEQTYPE seq, struct timeval time); 
+    void EnqueueSend(int64_t seq, struct timeval time);
+    void EnqueueRecv(int64_t seq, struct timeval time); 
     void LogUnexpected();
 
     void PrintStats();
     void PrintTempStats();
     void PrintTimeLine() const;
 
-    std::vector<MPSEQTYPE> timeline;
+    std::vector<int64_t> timeline;
     std::vector<uint64_t> time_of_packets;  // relative time 
                                             // to start_time in usec
-    std::vector<MPSEQTYPE> seq_of_packets;
+    std::vector<int64_t> seq_of_packets;
 
     void PrintResearch() const;
     
@@ -93,14 +93,14 @@ class MpingStat {
     std::vector<struct SendQueueNode> send_queue;
 
   private:
+    void ReserveTimeSeqVectors();
+    void InsertSequenceTime(int64_t seq, const struct timeval& now);
+    void InsertIntervalBoundary(const struct timeval& now);
+
     bool started;
     bool print_seq_time;
     struct timeval start_time;
     std::vector<uint64_t> interval_boundary;
-
-    void ReserveTimeSeqVectors();
-    void InsertSequenceTime(MPSEQTYPE seq, const struct timeval& now);
-    void InsertIntervalBoundary(const struct timeval& now);
 };
 
 #endif

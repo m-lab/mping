@@ -227,11 +227,11 @@ MpingSocket::~MpingSocket() {
   udp_sock = NULL;
 }
 
-size_t MpingSocket::SendPacket(const MPSEQTYPE& seq, uint16_t client_cookie,
+size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
                                size_t size, int *error) const {
   char buf[size];
   size_t send_size = 0;
-  MPSEQTYPE* seq_ptr;
+  int64_t* seq_ptr;
 
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
 
@@ -266,18 +266,18 @@ size_t MpingSocket::SendPacket(const MPSEQTYPE& seq, uint16_t client_cookie,
   cookie_ptr = reinterpret_cast<uint16_t*>(buf + buffer_length_);
   *cookie_ptr = htons(client_cookie);
 
-  seq_ptr = reinterpret_cast<MPSEQTYPE*>(buf + buffer_length_ + kCookieSize);
+  seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize);
   *seq_ptr = MPhton64(seq, is_big_end);
 
   // padding with ~seq to keep checksum constant
-  seq_ptr = reinterpret_cast<MPSEQTYPE*>(buf + buffer_length_ + kCookieSize +
-                                        sizeof(MPSEQTYPE));
+  seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize +
+                                        sizeof(int64_t));
   *seq_ptr = MPhton64(~seq, is_big_end);
 
   // there is 4 more bytes reserved, set it here. Now set to 0
   uint32_t *reserved_ptr;
   reserved_ptr = reinterpret_cast<uint32_t*>(buf + buffer_length_ + kCookieSize +
-                                        2 * sizeof(MPSEQTYPE));
+                                        2 * sizeof(int64_t));
   
   *reserved_ptr = 0;
 
@@ -313,7 +313,7 @@ size_t MpingSocket::SendPacket(const MPSEQTYPE& seq, uint16_t client_cookie,
   }
 }
 
-MPSEQTYPE MpingSocket::ReceiveAndGetSeq(int* error, 
+int64_t MpingSocket::ReceiveAndGetSeq(int* error, 
                                         MpingStat *mpstat) {
   if (client_mode_) {
     ASSERT(udp_sock != NULL);
@@ -480,7 +480,7 @@ MPSEQTYPE MpingSocket::ReceiveAndGetSeq(int* error,
       fromaddr_ = recvfromaddr.original_hostname;
 
     ptr += kSequenceOffset;
-    const MPSEQTYPE *seq = reinterpret_cast<const MPSEQTYPE*>(ptr);
+    const int64_t *seq = reinterpret_cast<const int64_t*>(ptr);
     *error = 0;
     return MPntoh64(*seq, is_big_end);
   }

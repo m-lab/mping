@@ -11,7 +11,7 @@ const size_t kCookieSize = sizeof(uint16_t);
 const size_t kSequenceOffset = kStrHeaderLength + kCookieSize;
 
 // all length include the last reserved 4 bytes
-const size_t kAllHeaderLen = kSequenceOffset + 2 * sizeof(MPSEQTYPE) + 4;
+const size_t kAllHeaderLen = kSequenceOffset + 2 * sizeof(int64_t) + 4;
 const size_t kMinBuffer = 9000;  // > 2 FDDI?
 
 const char *kTCPHelloMessage = "HLLO";
