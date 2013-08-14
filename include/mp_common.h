@@ -7,16 +7,16 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
-#include <string.h>
 #include <inttypes.h>
+#include <string.h>
 
 #include <string>
 
-#include <mp_log.h>
+#include "mp_log.h"
+
 typedef int64_t MPSEQTYPE;
 
-// extern const char* kPayloadHeader;
-// extern const size_t kPayloadHeaderLength;
+extern const int kDefaultTTL;
 
 extern const char *kStrHeader;
 extern const size_t kStrHeaderLength;
@@ -25,6 +25,13 @@ extern const size_t kCookieSize;
 extern const size_t kSequenceOffset;
 extern const size_t kAllHeaderLen;
 extern const size_t kMinBuffer;
+extern const char *kTCPHelloMessage;
+extern const char *kTCPDoneMessage;
+extern const char *kTCPConfirmMessage;
+extern const size_t kMPTCPMessageSize;
+extern const time_t kDefaultCleanUpTime;
+extern const char *kClientVersion;
+extern const char *kServerVersion;
 
 bool IsBigEndian();
 uint64_t MPhton64(uint64_t int_host, bool is_big_end);
@@ -44,10 +51,6 @@ enum MPTCPMessageCode {
   MPTCP_DONE,
   MPTCP_CONFIRM
 };
-
-extern const char *kTCPHelloMessage;
-extern const char *kTCPDoneMessage;
-extern const char *kTCPConfirmMessage;
 
 struct MPTCPMessage {
   char msg_code[4];
@@ -76,9 +79,6 @@ struct MPTCPMessage {
 
 MPTCPMessageCode GetTCPMsgCodeFromString(std::string str_code);
 ServerEchoMode GetTCPServerEchoModeFromShort(uint16_t type);
-
-extern const size_t kMPTCPMessageSize;
-extern const time_t kDefaultCleanUpTime;
 
 ssize_t StreamSocketSendWithTimeout(int sock, const char* buffer, size_t size);
 ssize_t StreamSocketRecvWithTimeout(int sock, char* buffer, size_t size);

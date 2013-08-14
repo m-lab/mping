@@ -2,8 +2,7 @@
 
 #include "mp_common.h"
 
-// const char *kPayloadHeader = "mlab-seq#";
-// const size_t kPayloadHeaderLength = strlen(kPayloadHeader);
+const int kDefaultTTL = 255;
 
 const char *kStrHeader = "ML";
 const size_t kStrHeaderLength = strlen(kStrHeader);
@@ -20,6 +19,9 @@ const char *kTCPDoneMessage = "DONE";
 const char *kTCPConfirmMessage = "CFRM";
 const size_t kMPTCPMessageSize = sizeof(MPTCPMessage);
 const time_t kDefaultCleanUpTime = 300;  // seconds
+//TODO(xunfan): compare client and server version to ensure compatibility
+const char *kClientVersion = "mping_server version: 2.1 (2013.08)";
+const char *kServerVersion = "mping_client version: 2.1 (2013.08)";
 
 bool IsBigEndian() {
   int i = 1;

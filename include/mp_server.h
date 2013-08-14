@@ -36,38 +36,28 @@ struct ClientStateNode {
       last_recv_time(start) {  }
 };
 
-struct CompareClientCookie {
-  bool operator() (const std::pair<uint16_t, ClientStateNode*>& p,
-                   uint16_t c) {
-    if (p.first < c)
-      return true;
-    else 
-      return false;
-  }
-};
-
 class MPingServer {
   public:
-    MPingServer(const int& argc, const char **argv); 
+    MPingServer(size_t packet_size, uint16_t server_port,
+                SocketFamily server_family); 
     void Run();
-    ClientStateNode *CheckClient(uint16_t client_cookie);
-    void DeleteClient(uint16_t client_cookie);
-    void InsertClient(uint16_t client_cookie, ClientStateNode *node);
 
   private:
-    bool have_data;
-    size_t packet_size;
-    uint16_t server_port;
-    SocketFamily server_family;
-    std::vector<std::pair<uint16_t, ClientStateNode*> > client_map;
-    pthread_mutex_t MuxClientMap;
-    pthread_mutex_t MuxLog;
+    size_t packet_size_;
+    uint16_t server_port_;
+    SocketFamily server_family_;
+    std::vector<std::pair<uint16_t, ClientStateNode*> > client_map_;
+    pthread_mutex_t MuxClientMap_;
+    pthread_mutex_t MuxLog_;
 
     static void *TCPThread(void *that);
     static void *UDPThread(void *that);
     static void *CleanupThread(void *that);
-    uint16_t GenerateClientCookie();
 
+    uint16_t GenerateClientCookie();
+    ClientStateNode *CheckClient(uint16_t client_cookie);
+    void DeleteClient(uint16_t client_cookie);
+    void InsertClient(uint16_t client_cookie, ClientStateNode *node);
     void PrintClientStats(ClientStateNode *node) const;
 };
 

@@ -70,9 +70,6 @@ class MpingStat {
                                             // to start_time in usec
     std::vector<MPSEQTYPE> seq_of_packets;
 
-    void ReserveTimeSeqVectors();
-    void InsertSequenceTime(MPSEQTYPE seq, const struct timeval& now);
-    void InsertIntervalBoundary(const struct timeval& now);
     void PrintResearch() const;
     
   protected:
@@ -100,6 +97,10 @@ class MpingStat {
     bool print_seq_time;
     struct timeval start_time;
     std::vector<uint64_t> interval_boundary;
+
+    void ReserveTimeSeqVectors();
+    void InsertSequenceTime(MPSEQTYPE seq, const struct timeval& now);
+    void InsertIntervalBoundary(const struct timeval& now);
 };
 
 #endif

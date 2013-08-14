@@ -16,8 +16,6 @@
 
 namespace {
 
-const int kMPDefaultTTL = 128;
-
 int AddressFamilyFor(SocketFamily family) {
   switch (family) {
     case SOCKETFAMILY_UNSPEC: return AF_UNSPEC;

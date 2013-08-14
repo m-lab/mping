@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 2.6)
 
 project (mping)
 
+find_package(Threads REQUIRED)
+
 set(PROJECT_ROOT_DIR ${PROJECT_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_ROOT_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_ROOT_DIR}/lib)
@@ -29,8 +31,6 @@ include_directories(
   ${MLAB_LIBRARIES_ROOT}/include
   ${GTEST_ROOT}/include)
 
-set(PTHREADS_LIB pthread)
-
 link_directories(
   ${MLAB_LIBRARIES_ROOT}/lib
   ${GTEST_ROOT}/lib)
@@ -48,7 +48,7 @@ add_subdirectory(${MLAB_LIBRARIES_ROOT})
 add_executable(mping_client ${MPCLIENT_SRC_FILES})
 add_executable(mping_server ${MPSERVER_SRC_FILES})
 target_link_libraries(mping_client mlab)
-target_link_libraries(mping_server mlab ${PTHREADS_LIB})
+target_link_libraries(mping_server mlab ${CMAKE_THREAD_LIBS_INIT})
 
 # Build supplement targets
 add_subdirectory(test)
