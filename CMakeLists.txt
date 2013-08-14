@@ -29,6 +29,7 @@ include_directories(
   ${MLAB_LIBRARIES_ROOT}/include
   ${GTEST_ROOT}/include)
 
+set(PTHREADS_LIB pthread)
 
 link_directories(
   ${MLAB_LIBRARIES_ROOT}/lib
@@ -47,7 +48,7 @@ add_subdirectory(${MLAB_LIBRARIES_ROOT})
 add_executable(mping_client ${MPCLIENT_SRC_FILES})
 add_executable(mping_server ${MPSERVER_SRC_FILES})
 target_link_libraries(mping_client mlab)
-target_link_libraries(mping_server mlab)
+target_link_libraries(mping_server mlab ${PTHREADS_LIB})
 
 # Build supplement targets
 add_subdirectory(test)

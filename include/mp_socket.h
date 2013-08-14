@@ -30,21 +30,27 @@ class MpingSocket {
       family_(SOCKETFAMILY_UNSPEC),
       buffer_length_(0),
       use_udp_(false),
-      client_mode_(false),
-      is_big_end(IsBigEndian()) {
+      client_mode_(0),
+      is_big_end(IsBigEndian()),
+      destport_(0) {
         memset(&srcaddr_, 0, sizeof(srcaddr_));
         memset(buffer_, 0, sizeof(buffer_));
-      }
+    }
     
     int Initialize(const std::string& destip, const std::string& srcip,
                    int ttl, size_t pktsize, int wndsize, 
-                   uint16_t port, bool clientmode);
+                   uint16_t port, uint16_t clientmode);
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const MPSEQTYPE& seq, size_t size, int *error) const;
+    size_t SendPacket(const MPSEQTYPE& seq, uint16_t client_cookie,
+                      size_t size, int *error) const;
     MPSEQTYPE ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
+
+    // TCP communication with server end
+    bool SendHello(uint16_t *cookie);
+    void SendDone(uint16_t cookie);
 
   protected:
     mlab::RawSocket *icmp_sock;
@@ -59,9 +65,12 @@ class MpingSocket {
     char buffer_[64];
     int buffer_length_;
     bool use_udp_;
-    bool client_mode_;
+    uint16_t client_mode_;
     std::string fromaddr_;
     bool is_big_end;
+    std::string destaddr_;
+    uint16_t destport_;
+    std::string bindaddr_;
 };
 
 #endif

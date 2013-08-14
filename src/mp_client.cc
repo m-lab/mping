@@ -11,7 +11,6 @@
 #include "mlab/host.h"
 #include "mlab/mlab.h"
 #include "mlab/protocol_header.h"
-#include "mlab/server_socket.h"
 #include "mp_common.h"
 #include "mp_log.h"
 #include "mp_client.h"
@@ -34,11 +33,13 @@ namespace {
       -B <bnum>   Send <bnum> packets in burst, should smaller than <num>\n\
       -p <port>   If UDP, destination port number\n\
 \n\
-      -c          Client mode, sending with UDP to a server running -s\n\
-      -r          Print time and sequence number of every send/recv packet.\n\
-                  The time is relative to the first packet sent.\n\
-                  A negative sequence number indicates a recv packet.\n\
-                  Be careful, there usually are huge number of packets.\n\
+      -c <mode>   Client mode, sending with UDP to a mping server\n\
+                  <mode> coule be 1 and 2, 1 means server echo back\n\
+                  whole pakcet, 2 means server echo back first 24 bytes\n\
+      -r          Print time and sequence number of every send/recv packet\n\
+                  The time is relative to the first packet sent\n\
+                  A negative sequence number indicates a recv packet\n\
+                  Be careful, there usually are huge number of packets\n\
 \n\
       -V, -d  Version, Debug (verbose)\n\
 \n\
@@ -144,11 +145,22 @@ bool MPingClient::GoProbing(const std::string& dst_addr) {
     return false;
   }
 
+  // make TCP to server is in C/S mode
+  if (client_mode > 0) {
+    if (!mysock->SendHello(&client_cookie))
+      return false;
+//    LOG(INFO, "client_cookie %d", client_cookie);
+  }
+
   if (!TTLLoop(mysock.get())) {
     return false;
   }
 
   mp_stat.PrintStats();
+
+  if (client_mode > 0) {
+    mysock->SendDone(client_cookie);
+  }
 
   return true;
 }
@@ -356,7 +368,7 @@ bool MPingClient::IntervalLoop(int intran, MpingSocket *sock) {
 
     while (need_send > 0) {
       sseq++;
-      rt = sock->SendPacket(sseq, cur_packet_size, &err);
+      rt = sock->SendPacket(sseq, client_cookie, cur_packet_size, &err);
 
       if (rt < 0) {  // send fails
         if (err != EINTR) { 
@@ -436,29 +448,28 @@ bool MPingClient::IntervalLoop(int intran, MpingSocket *sock) {
   return true;
 }
 
-MPingClient::MPingClient(const int& argc, const char **argv) :
-      pkt_size(0),                                                              
-//      server_port(0),
-//      server_family(SOCKETFAMILY_UNSPEC),
-      win_size(4),                                                              
-      loop(false),                                                              
-      rate(0),                                                                  
-      slow_start(false),                                                        
-      ttl(0),                                                                   
-      inc_ttl(0),                                                               
-      loop_size(0),                                                             
-      version(false),                                                           
-      debug(false),                                                             
-      burst(0),                                                                 
-      interval(0),
-      dport(0),
-      client_mode(false),
-      print_seq_time(false),
-      mp_stat(win_size, print_seq_time),
-      start_burst(false),
-      sseq(0),
-      mrseq(0),
-      cur_packet_size(0) {
+MPingClient::MPingClient(const int& argc, const char **argv) 
+    :  pkt_size(0),
+       win_size(4),
+       loop(false),
+       rate(0),
+       slow_start(false),
+       ttl(0),
+       inc_ttl(0),
+       loop_size(0),
+       version(false),
+       debug(false),
+       burst(0),
+       interval(0),
+       dport(0),
+       client_mode(0),
+       client_cookie(0),
+       print_seq_time(false),
+       mp_stat(win_size, print_seq_time),
+       start_burst(false),
+       sseq(0),
+       mrseq(0),
+       cur_packet_size(0) {
   int ac = argc;
   const char **av = argv;
   const char *p;
@@ -481,7 +492,6 @@ MPingClient::MPingClient(const int& argc, const char **argv) :
           case 'S': slow_start = true; av--; break;
           case 'V': version = true; av--; break;
           case 'd': debug = true; av--; break;
-          case 'c': client_mode = true; av--; break;
           case 'r': print_seq_time = true; av--; break;
           default: LOG(FATAL, "\n%s", usage); break;
         }
@@ -499,7 +509,7 @@ MPingClient::MPingClient(const int& argc, const char **argv) :
           case 'B': { burst = atoi(*av); ac--; break; }
           case 'V': { version = true; av--; break; }
           case 'd': { debug = true; av--; break; }
-          case 'c': { client_mode = true; av--; break; }
+          case 'c': { client_mode = atoi(*av); ac--; break; }
           case 'r': { print_seq_time = true; av--; break; }
           case 'F': { src_addr = std::string(*av); ac--; break; }
           default: { 
@@ -556,9 +566,13 @@ void MPingClient::ValidatePara() {
   }
 
   // client mode
-  if (client_mode) {
+  if (client_mode > 0) {
     if (dport == 0) {
       LOG(FATAL, "Client mode must have destination port using -p.");
+    }
+
+    if (client_mode > 2) {
+      LOG(FATAL, "Client mode can only be set to 1 or 2.");
     }
 
     if (ttl == 0) {
@@ -610,8 +624,8 @@ void MPingClient::ValidatePara() {
 
   // validate UDP destination port
   if (dport > 0 ) {
-    if (ttl == 0 && !client_mode) {
-      LOG(FATAL, "-p can only use together with -t -a or -p.\n%s", usage);
+    if (ttl == 0 && client_mode == 0) {
+      LOG(FATAL, "-p can only use together with -t -a or -c.\n%s", usage);
     }
 
     if (dport > 65535) {

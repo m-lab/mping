@@ -52,7 +52,8 @@ class MPingClient{
     int        burst;  // burst size
     int        interval;  // undefined now
     int        dport;
-    bool       client_mode;
+    uint16_t   client_mode;
+    uint16_t   client_cookie;
     std::string src_addr;
     std::string dst_host;
     std::set<std::string> dest_ips;
