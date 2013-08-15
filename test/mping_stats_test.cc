@@ -1,6 +1,6 @@
 #include "mp_common.h"
 #include "mp_log.h"
-#include "mp_mping.h"
+#include "mp_client.h"
 #include "mp_stats.h"
 #include "scoped_ptr.h"
 
@@ -84,4 +84,7 @@ class MpingStatsTest : public MpingStat {
 
 //TEST(TestMpingStats, EnqueueTest) {
 //  MpingStatsTest t;
+//
+//  int in1, in2
+//  t.TestSend(&in1, &in2);
 //}

@@ -1,4 +1,4 @@
-#include "mp_mping.h"
+#include "mp_client.h"
 #include "mp_common.h"
 #include "mp_socket.h"
 #include "mp_stats.h"
@@ -6,20 +6,13 @@
 
 #include "gtest/gtest.h"
 
-namespace {
-  const char *myargv[] = {"mping",
-                          "-n", 
-                          "5", 
-                          "-b", 
-                          "64", 
-                          "127.0.0.1", NULL}; 
-  const int kMyArgc = 6; 
-}
-
-class MPingUnitTestBase : public MPing {
+class MPingUnitTestBase : public MPingClient {
   public: 
-    MPingUnitTestBase() : MPing(kMyArgc, myargv) { }
+    MPingUnitTestBase() : MPingClient(64, 5, false, false, 0, 0, 0, 0, 0, 0,
+                                      false, std::string(""), 
+                                      std::string("127.0.0.1")) { }
 };
+
 
 class MPingRunClientTest : public MPingUnitTestBase {
   public:
@@ -30,7 +23,7 @@ class MPingRunClientTest : public MPingUnitTestBase {
                               "172.16.0.1",
                               "10.0.0.1"};
       std::set<std::string> tempset(strset, strset+3);
-      dest_ips = tempset;
+      dest_ips_ = tempset;
 
       Run();
     }

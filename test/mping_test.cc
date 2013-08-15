@@ -1,4 +1,4 @@
-#include "mp_mping.h"
+#include "mp_client.h"
 #include "mp_common.h"
 #include "mp_socket.h"
 #include "mp_stats.h"
@@ -6,19 +6,21 @@
 
 #include "gtest/gtest.h"
 
-namespace {
-  const char *myargv[] = {"mping",
-                          "-n", 
-                          "5", 
-                          "-b", 
-                          "64", 
-                          "127.0.0.1", NULL}; 
-  const int kMyArgc = 6; 
-}
-
-class MPingUnitTestBase : public MPing {
+class MPingUnitTestBase : public MPingClient {
   public: 
-    MPingUnitTestBase() : MPing(kMyArgc, myargv) { }
+    MPingUnitTestBase() : MPingClient(64,     // packet size -b
+                                      5,      // window size -n
+                                      false,  // loop forever, -f
+                                      false,  // slowstart, -S
+                                      0,      // ttl, -t
+                                      0,      // ttlmax, -a
+                                      0,      // loop through size, -l
+                                      0,      // burst size, -B
+                                      0,      // destination port, -p
+                                      0,      // use UDP server, -c
+                                      false,  // print time sequence, -r
+                                      std::string(""),  // source address, -F
+                                      std::string("127.0.0.1")) { } 
 };
 
 TEST(MpingUnitTest, GetNeedSendTest) {

@@ -25,18 +25,17 @@ extern const time_t kDefaultCleanUpTime;
 extern const char *kVersion;
 
 bool IsBigEndian();
-uint64_t MPhton64(uint64_t int_host, bool is_big_end);
-uint64_t MPntoh64(uint64_t int_net, bool is_big_end);
+uint64_t MPhton64(uint64_t int_host);
+uint64_t MPntoh64(uint64_t int_net);
 
 // server echo mode
-
-#define NUM_ECHO_MODES 4
 
 enum ServerEchoMode {
   ECHOMODE_UNSPEC,
   ECHOMODE_WHOLE,
   ECHOMODE_SMALL,
-  ECHOMODE_LARGE  // reserve for future
+  ECHOMODE_LARGE,  // reserve for future
+  NUM_ECHO_MODES
 };
 
 enum MPTCPMessageCode {

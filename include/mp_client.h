@@ -27,10 +27,10 @@
 
 class MPingClient{
   public:
-    MPingClient(size_t pkt_size, int win_size, bool loop, int rate,
+    MPingClient(size_t pkt_size, int win_size, bool loop,
                 bool slow_start, int ttl, int inc_ttl, 
                 int loop_size, int burst, uint16_t dport,
-                uint16_t client_mode, bool print_seq_time,
+                uint16_t use_server, bool print_seq_time,
                 const std::string& src_addr,
                 const std::string& dst_host);
     void Run();
@@ -58,14 +58,13 @@ class MPingClient{
     size_t     pkt_size_;  // packet size in bytes
     int        win_size_;  
     bool       loop_;
-    int        rate_;
     bool       slow_start_;
     int        ttl_;
     int        inc_ttl_;  // auto increase TTL to this value
     int        loop_size_;  // 1 to 4
     int        burst_;  // burst size
     int        dport_;
-    uint16_t   client_mode_;
+    uint16_t   use_server_;
     uint16_t   client_cookie_;
     std::string src_addr_;
     std::string dst_host_;

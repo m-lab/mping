@@ -28,12 +28,12 @@ bool IsBigEndian() {
   return ((char)i) == 0;
 }
 
-uint64_t MPhton64(uint64_t int_host, bool is_big_end) {
-  return is_big_end ? int_host : bswap_64(int_host);
+uint64_t MPhton64(uint64_t int_host) {
+  return IsBigEndian() ? int_host : bswap_64(int_host);
 }
 
-uint64_t MPntoh64(uint64_t int_net, bool is_big_end) {
-  return is_big_end ? int_net : bswap_64(int_net);
+uint64_t MPntoh64(uint64_t int_net) {
+  return IsBigEndian() ? int_net : bswap_64(int_net);
 }
 
 MPTCPMessageCode GetTCPMsgCodeFromString(const std::string& str_code) {

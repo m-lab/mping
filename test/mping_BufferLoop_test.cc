@@ -1,4 +1,4 @@
-#include "mp_mping.h"
+#include "mp_client.h"
 #include "mp_common.h"
 #include "mp_socket.h"
 #include "mp_stats.h"
@@ -6,29 +6,17 @@
 
 #include "gtest/gtest.h"
 
-namespace {
-  const char *myargv[] = {"mping",
-                          "-n", 
-                          "5", 
-                          "-b", 
-                          "64", 
-                          "127.0.0.1", NULL}; 
-  const int kMyArgc = 6; 
-}
-
-class MPingUnitTestBase : public MPing {
-  public: 
-    MPingUnitTestBase() : MPing(kMyArgc, myargv) { }
-};
-
-class MPingBufferLoopTest : public MPingUnitTestBase {
+class MPingBufferLoopTest : public MPingClient{
   public:
     std::vector<size_t> size_array;
 
-    MPingBufferLoopTest() : MPingUnitTestBase() { } 
+    MPingBufferLoopTest() : MPingClient(64, 5, false, false, 0, 0, 0, 0, 0, 0,
+                                        false, std::string(""), 
+                                        std::string("127.0.0.1")) { }
+
     void GoTest(size_t p_size, int l_size) {
-      pkt_size = p_size;
-      loop_size = l_size;
+      pkt_size_ = p_size;
+      loop_size_ = l_size;
       size_array.clear();
 
       MpingSocket tempmpsock;
@@ -37,7 +25,7 @@ class MPingBufferLoopTest : public MPingUnitTestBase {
 
   protected:
     virtual bool WindowLoop(MpingSocket *sock) {
-      size_array.push_back(cur_packet_size);
+      size_array.push_back(cur_packet_size_);
       return true;
     }
 };

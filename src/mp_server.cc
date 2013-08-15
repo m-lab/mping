@@ -36,30 +36,27 @@ void MPingServer::Run() {
   MPLOG(MPLOG_DEF, "Running server mode, port %u.", server_port_);
 
   // start threads for two sockets and regular clean up
-  pthread_t tcp_thread;
-  pthread_t udp_thread;
-  pthread_t cleanup_thread;
 
   pthread_mutex_init(&client_map_mutex_, NULL);
   pthread_mutex_init(&MuxLog_, NULL);
 
+  pthread_t tcp_thread;
   if (pthread_create(&tcp_thread, 0, &TCPThread, this) != 0) {
     LOG(FATAL, "Cannot create TCP thread. %s [%d]", strerror(errno), errno);
   }
   
+  pthread_t udp_thread;
   if (pthread_create(&udp_thread, 0, &UDPThread, this) != 0) {
     LOG(FATAL, "Cannot create UDP thread. %s [%d]", strerror(errno), errno);
   }
 
+  pthread_t cleanup_thread;
   if (pthread_create(&cleanup_thread, 0, &CleanupThread, 
                      this) != 0) {
     LOG(FATAL, "Cannot create Cleanup thread. %s [%d]", strerror(errno), errno);
   }
 
   LOG(INFO, "Waiting threads to exit.");
-//  pthread_join(tcp_thread, NULL);
-//  pthread_join(udp_thread, NULL);
-//  pthread_join(cleanup_thread, NULL);
   pthread_exit(NULL);
 }
 
@@ -73,10 +70,9 @@ uint16_t MPingServer::GenerateClientCookie() {
 
   int generate_time = 0;
   while (CheckClient(r) != NULL) {
-    client_cookie_num++;
-    r = client_cookie_num % 65535;
-    generate_time++;
+    r = (++client_cookie_num) % 65535;
 
+    generate_time++;
     if (generate_time >= 65535)
       LOG(FATAL, "failed to generate client cookie.");
   }
@@ -214,7 +210,6 @@ void *MPingServer::UDPThread(void *that) {
              (const char*) &zero, sizeof(zero));
 
   timeval now;
-  bool is_big_end = IsBigEndian();
   while (1) {
     errno = 0;
     ssize_t num_bytes = 0;
@@ -272,7 +267,7 @@ void *MPingServer::UDPThread(void *that) {
         reinterpret_cast<const int64_t*>(recv_packet.buffer() +
                                            kSequenceOffset);
 
-    int64_t rseq = MPntoh64(*pseq, is_big_end);
+    int64_t rseq = MPntoh64(*pseq);
     statenode->sequence_recv++;
 
     if (statenode->max_recv_seq > rseq) {

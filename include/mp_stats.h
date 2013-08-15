@@ -48,11 +48,11 @@ class MpingStat {
         lost_num_temp_(0),
         window_size_(0),
         send_queue_size_(4 * win_size), // Delay > 4 RTT means packet drop.
-        started(false),
-        print_seq_time(print_sequence_time) { 
-      send_queue.reserve(send_queue_size_);
+        started_(false),
+        print_seq_time_(print_sequence_time) { 
+      send_queue_.reserve(send_queue_size_);
 
-      if (print_seq_time) {
+      if (print_seq_time_) {
         ReserveTimeSeqVectors();
       }
     }
@@ -64,13 +64,12 @@ class MpingStat {
     void PrintStats();
     void PrintTempStats();
     void PrintTimeLine() const;
-
-    std::vector<int64_t> timeline;
-    std::vector<uint64_t> time_of_packets;  // relative time 
-                                            // to start_time in usec
-    std::vector<int64_t> seq_of_packets;
-
     void PrintResearch() const;
+
+    std::vector<int64_t> timeline_;
+    std::vector<uint64_t> time_of_packets_;  // relative time 
+                                            // to start_time in usec
+    std::vector<int64_t> seq_of_packets_;
     
   protected:
     int64_t unexpect_num_;
@@ -90,17 +89,17 @@ class MpingStat {
     int64_t lost_num_temp_;
     int window_size_;
     int send_queue_size_;
-    std::vector<struct SendQueueNode> send_queue;
+    std::vector<struct SendQueueNode> send_queue_;
 
   private:
     void ReserveTimeSeqVectors();
     void InsertSequenceTime(int64_t seq, const struct timeval& now);
     void InsertIntervalBoundary(const struct timeval& now);
 
-    bool started;
-    bool print_seq_time;
-    struct timeval start_time;
-    std::vector<uint64_t> interval_boundary;
+    bool started_;
+    bool print_seq_time_;
+    struct timeval start_time_;
+    std::vector<uint64_t> interval_boundary_;
 };
 
 #endif

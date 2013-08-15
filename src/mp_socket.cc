@@ -29,7 +29,7 @@ int AddressFamilyFor(SocketFamily family) {
 
 int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
                             int ttl, size_t pktsize, int wndsize, 
-                            uint16_t port, uint16_t clientmode) {
+                            uint16_t port, uint16_t useserver) {
   family_ = mlab::GetSocketFamilyForAddress(destip);
 
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
@@ -151,7 +151,7 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
       return -1;
     }
 
-    if (clientmode == 0) {
+    if (useserver == 0) {
       // icmp to recv
       icmp_sock = 
           mlab::RawSocket::Create(SOCKETTYPE_ICMP, family_);
@@ -173,7 +173,7 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
         udp_sock->SetSendBufferSize(pktsize);
       }
     } else {
-      client_mode_ = clientmode;
+      use_server_ = useserver;
     }
 
     // build packet
@@ -267,12 +267,12 @@ size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
   *cookie_ptr = htons(client_cookie);
 
   seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize);
-  *seq_ptr = MPhton64(seq, is_big_end);
+  *seq_ptr = MPhton64(seq);
 
   // padding with ~seq to keep checksum constant
   seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize +
                                         sizeof(int64_t));
-  *seq_ptr = MPhton64(~seq, is_big_end);
+  *seq_ptr = MPhton64(~seq);
 
   // there is 4 more bytes reserved, set it here. Now set to 0
   uint32_t *reserved_ptr;
@@ -301,7 +301,7 @@ size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
   } else {  // UDP
     ASSERT(udp_sock != NULL);
 
-    if (client_mode_ == 0) {
+    if (use_server_ == 0) {
       bzero(buf + buffer_length_ + kAllHeaderLen - kStrHeaderLength, 
             send_size - buffer_length_ - kAllHeaderLen + kStrHeaderLength);
     }
@@ -315,7 +315,7 @@ size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
 
 int64_t MpingSocket::ReceiveAndGetSeq(int* error, 
                                         MpingStat *mpstat) {
-  if (client_mode_) {
+  if (use_server_ > 0) {
     ASSERT(udp_sock != NULL);
   } else {
     ASSERT(icmp_sock != NULL);
@@ -373,7 +373,7 @@ int64_t MpingSocket::ReceiveAndGetSeq(int* error,
       return 0;
   }
 
-  if (client_mode_) {
+  if (use_server_) {
     should_recv_size = kAllHeaderLen;
     payload_offset = 0;
   }
@@ -383,7 +383,7 @@ int64_t MpingSocket::ReceiveAndGetSeq(int* error,
   mlab::Host recvfromaddr("127.0.0.1");
   while (1) {
     mlab::Packet recv_packet("");
-    if (client_mode_ > 0) {
+    if (use_server_ > 0) {
       recv_packet = udp_sock->Receive(should_recv_size, &num_bytes);
     } else {
       if (use_udp_)
@@ -401,7 +401,7 @@ int64_t MpingSocket::ReceiveAndGetSeq(int* error,
 
     ptr = recv_packet.buffer();
 
-    if (client_mode_ == 0) {
+    if (use_server_ == 0) {
       // check length: ICMP?
       if (recv_packet.length() < min_recv_size) {
         LOG(VERBOSE, "recv a packet smaller than regular %s.",
@@ -482,7 +482,7 @@ int64_t MpingSocket::ReceiveAndGetSeq(int* error,
     ptr += kSequenceOffset;
     const int64_t *seq = reinterpret_cast<const int64_t*>(ptr);
     *error = 0;
-    return MPntoh64(*seq, is_big_end);
+    return MPntoh64(*seq);
   }
 }
 
@@ -504,28 +504,39 @@ bool MpingSocket::SendHello(uint16_t *cookie) {
                                         SOCKETTYPE_TCP, family_);
   }
 
-  if (c_sock == NULL)
+  if (c_sock == NULL) {
+    LOG(ERROR, "Create TCP socket fails.");
     return false;
+  }
 
   // send hello
-  MPTCPMessage msg(MPTCP_HELLO, client_mode_, 0);
+  MPTCPMessage msg(MPTCP_HELLO, use_server_, 0);
 
   if (StreamSocketSendWithTimeout(c_sock->raw(), 
                                   reinterpret_cast<const char*>(&msg),
-                                  kMPTCPMessageSize) < 0)
+                                  kMPTCPMessageSize) < 0) {
+    LOG(ERROR, "TCP send 'Hello' message fails.");
+    delete c_sock;
     return false;
+  }
   
   // receive confirm
   char recv_buf[kMPTCPMessageSize];
   if (StreamSocketRecvWithTimeout(c_sock->raw(),
-                                  recv_buf, kMPTCPMessageSize) < 0)
+                                  recv_buf, kMPTCPMessageSize) < 0) {
+    LOG(ERROR, "TCP receive 'Confirm' message fails.");
+    delete c_sock;
     return false;
+  }
 
   MPTCPMessage *msg_ptr = reinterpret_cast<MPTCPMessage*>(recv_buf);
 
   // sanity check
-  if (std::string(msg_ptr->msg_code, 4) != kTCPConfirmMessage)
+  if (std::string(msg_ptr->msg_code, 4) != kTCPConfirmMessage) {
+    LOG(ERROR, "Received TCP message is not 'Confirm'.");
+    delete c_sock;
     return false;
+  }
 
   // get cookie
   *cookie = ntohs(msg_ptr->msg_value);
@@ -546,14 +557,18 @@ void MpingSocket::SendDone(uint16_t cookie) {
                                         SOCKETTYPE_TCP, family_);
   }
 
-  if (c_sock == NULL)
+  if (c_sock == NULL) {
+    LOG(ERROR, "Create TCP socket fails.");
     return;
+  }
 
   // Send Done
   MPTCPMessage msg(MPTCP_DONE, 0, cookie);
-  StreamSocketSendWithTimeout(c_sock->raw(),
-                              reinterpret_cast<const char*>(&msg),
-                              kMPTCPMessageSize);
+  if (StreamSocketSendWithTimeout(c_sock->raw(),
+                                  reinterpret_cast<const char*>(&msg),
+                                  kMPTCPMessageSize) < 0) {
+    LOG(ERROR, "TCP send 'Done' message fails.");
+  }
 
   delete c_sock;
 }

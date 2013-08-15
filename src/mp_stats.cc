@@ -46,22 +46,22 @@ void MpingStat::EnqueueSend(int64_t seq,
   send_num_temp_++;
 
   if (seq <= send_queue_size_) {  // no record in queue
-    send_queue.push_back(TempNode);
+    send_queue_.push_back(TempNode);
   } else {
-    if (send_queue.at(idx).recv_time.tv_sec == 0) {  // previous one recved
+    if (send_queue_.at(idx).recv_time.tv_sec == 0) {  // previous one recved
       lost_num_++;
       lost_num_temp_++;
     } 
 
-    send_queue.at(idx) = TempNode;
+    send_queue_.at(idx) = TempNode;
   }
   
-  if (print_seq_time) {
+  if (print_seq_time_) {
     InsertSequenceTime(seq, time);
   }
 #ifdef MP_TEST
   // timeline
-  timeline.push_back(seq);
+  timeline_.push_back(seq);
 #endif
 }
 
@@ -69,11 +69,11 @@ void MpingStat::EnqueueRecv(int64_t seq,
                             struct timeval time) {
   int idx = (seq-1) % send_queue_size_;
 
-  if (send_queue.at(idx).seq == seq) {
-    if (send_queue.at(idx).recv_time.tv_sec == 0) {
+  if (send_queue_.at(idx).seq == seq) {
+    if (send_queue_.at(idx).recv_time.tv_sec == 0) {
       recv_unique_num_++;
       recv_unique_num_temp_++;
-      send_queue.at(idx).recv_time = time;  // only record first recv time
+      send_queue_.at(idx).recv_time = time;  // only record first recv time
     } else {  // dup packet
       duplicate_num_++;
       duplicate_num_temp_++;
@@ -85,7 +85,7 @@ void MpingStat::EnqueueRecv(int64_t seq,
     } else {
       max_recv_seq_ = seq;
     }
-  } else if (seq > send_queue.at(idx).seq) {
+  } else if (seq > send_queue_.at(idx).seq) {
     unexpect_num_++;
     unexpect_num_temp_++;
   }
@@ -93,13 +93,13 @@ void MpingStat::EnqueueRecv(int64_t seq,
   recv_num_++;
   recv_num_temp_++;
 
-  if (print_seq_time) {
-    InsertSequenceTime((0-seq), time);
+  if (print_seq_time_) {
+    InsertSequenceTime(-seq, time);
   }
 
   // timeline
 #ifdef MP_TEST
-  timeline.push_back(0 - seq);
+  timeline_.push_back(0 - seq);
 #endif
 }
 
@@ -110,13 +110,13 @@ void MpingStat::LogUnexpected() {
 
 void MpingStat::PrintTimeLine() const {
   unsigned int idx = 0;
-  while (idx<timeline.size()) {
-    if (timeline.at(idx) > 0)
-      std::cout << std::setw(5) << timeline.at(idx) 
+  while (idx<timeline_.size()) {
+    if (timeline_.at(idx) > 0)
+      std::cout << std::setw(5) << timeline_.at(idx) 
                 << " --> " << std::endl;
     else
       std::cout << "      <-- " << std::setw(5) << 
-                   timeline.at(idx) << std::endl;
+                   timeline_.at(idx) << std::endl;
 
     idx++;
   }
@@ -138,7 +138,7 @@ void MpingStat::PrintTempStats() {
   duplicate_num_temp_ = 0;
   unexpect_num_temp_ = 0;
 
-  if (print_seq_time) {
+  if (print_seq_time_) {
     struct timeval t;
     gettimeofday(&t, 0);
     InsertIntervalBoundary(t);
@@ -147,8 +147,8 @@ void MpingStat::PrintTempStats() {
 
 void MpingStat::PrintStats() {
   // check last round losts
-  for (size_t i = 0; i < send_queue.size(); i++) {
-    if (send_queue.at(i).recv_time.tv_sec == 0) {
+  for (size_t i = 0; i < send_queue_.size(); i++) {
+    if (send_queue_.at(i).recv_time.tv_sec == 0) {
       lost_num_++;
       lost_num_temp_++;
     }
@@ -163,41 +163,41 @@ void MpingStat::PrintStats() {
                    lost_num_ * 100.0 / send_num_, duplicate_num_,
                    unexpect_num_);
 
-  if (print_seq_time)
+  if (print_seq_time_)
     PrintResearch();
 }
 
 void MpingStat::ReserveTimeSeqVectors() {
-  time_of_packets.reserve(kDefaultVectorLength);
-  seq_of_packets.reserve(kDefaultVectorLength);
-  interval_boundary.reserve(kDefaultRunTime);
+  time_of_packets_.reserve(kDefaultVectorLength);
+  seq_of_packets_.reserve(kDefaultVectorLength);
+  interval_boundary_.reserve(kDefaultRunTime);
 }
 
 void MpingStat::InsertSequenceTime(int64_t seq, const struct timeval& now) {
-  if (!started) {
-    started = true;
-    start_time = now;
-    time_of_packets.push_back(0);
-    seq_of_packets.push_back(seq);
+  if (!started_) {
+    started_ = true;
+    start_time_ = now;
+    time_of_packets_.push_back(0);
+    seq_of_packets_.push_back(seq);
   }
   
-  if (started) {
-    time_of_packets.push_back(time_sub(now, start_time));
-    seq_of_packets.push_back(seq);
+  if (started_) {
+    time_of_packets_.push_back(time_sub(now, start_time_));
+    seq_of_packets_.push_back(seq);
   }
 }
 
 void MpingStat::InsertIntervalBoundary(const struct timeval& now) {
-  interval_boundary.push_back(time_sub(now, start_time));
+  interval_boundary_.push_back(time_sub(now, start_time_));
 }
 
 void MpingStat::PrintResearch() const {
-  for (size_t i = 0; i < time_of_packets.size(); i++) {
+  for (size_t i = 0; i < time_of_packets_.size(); i++) {
     MPLOG(MPLOG_DEF, "[Research seq-time];%ld;%lu", 
-          seq_of_packets.at(i), time_of_packets.at(i));
+          seq_of_packets_.at(i), time_of_packets_.at(i));
   }
 
-  for (size_t j = 0; j < interval_boundary.size(); j++) {
-    MPLOG(MPLOG_DEF, "[Research interval-switch];%lu", interval_boundary.at(j));
+  for (size_t j = 0; j < interval_boundary_.size(); j++) {
+    MPLOG(MPLOG_DEF, "[Research interval-switch];%lu", interval_boundary_.at(j));
   }
 }

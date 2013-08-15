@@ -16,9 +16,6 @@ namespace {
 }  // namespace
 
 int main(int argc, const char** argv) {
-  int ac = argc;
-  const char **av = argv;
-  const char *p;
   bool port_set = false;
 
   size_t packet_size = kMinBuffer;
@@ -32,26 +29,26 @@ int main(int argc, const char** argv) {
     exit(0);
   }
 
-  ac--;
-  av++;
+  argc--;
+  argv++;
 
-  while (ac > 0) {
-    p = *av++;
+  while (argc > 0) {
+    const char *p = *argv++;
 
     if (p[0] == '-') {
-      if (ac == 1) {
+      if (argc == 1) {
         switch (p[1]) {  // those switches without value
-          case '6': server_family = SOCKETFAMILY_IPV6; av--; break;
-          case 'V': version = true; av--; break;
-          case 'd': debug = true; av--; break;
+          case '6': server_family = SOCKETFAMILY_IPV6; argv--; break;
+          case 'V': version = true; argv--; break;
+          case 'd': debug = true; argv--; break;
           default: LOG(FATAL, "\n%s", usage); break;
         }
       } else {
         switch (p[1]) {
-          case 'b': { packet_size = strtol(*av, NULL, 10); ac--; break; }
-          case '6': { server_family = SOCKETFAMILY_IPV6; av--; break; }
-          case 'V': version = true; av--; break;
-          case 'd': debug = true; av--; break;
+          case 'b': { packet_size = strtol(*argv, NULL, 10); argc--; break; }
+          case '6': { server_family = SOCKETFAMILY_IPV6; argv--; break; }
+          case 'V': version = true; argv--; break;
+          case 'd': debug = true; argv--; break;
           default: { 
             LOG(FATAL, "Unknown parameter -%c\n%s", p[1], usage); break; 
           }
@@ -60,7 +57,7 @@ int main(int argc, const char** argv) {
     } else {  // port
       if (!port_set) {
         server_port = strtol(p, NULL, 10);
-        av--;
+        argv--;
         port_set = true;
       }else{
         LOG(FATAL, "try to set port %s, but port is already set to %d\n%s", 
@@ -68,8 +65,8 @@ int main(int argc, const char** argv) {
       }
     }
 
-    ac--;
-    av++;
+    argc--;
+    argv++;
   }
 
   if (version) {

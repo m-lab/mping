@@ -30,8 +30,7 @@ class MpingSocket {
       family_(SOCKETFAMILY_UNSPEC),
       buffer_length_(0),
       use_udp_(false),
-      client_mode_(0),
-      is_big_end(IsBigEndian()),
+      use_server_(0),
       destport_(0) {
         memset(&srcaddr_, 0, sizeof(srcaddr_));
         memset(buffer_, 0, sizeof(buffer_));
@@ -39,7 +38,7 @@ class MpingSocket {
     
     int Initialize(const std::string& destip, const std::string& srcip,
                    int ttl, size_t pktsize, int wndsize, 
-                   uint16_t port, uint16_t clientmode);
+                   uint16_t port, uint16_t useserver);
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
@@ -65,9 +64,8 @@ class MpingSocket {
     char buffer_[64];
     int buffer_length_;
     bool use_udp_;
-    uint16_t client_mode_;
+    uint16_t use_server_;
     std::string fromaddr_;
-    bool is_big_end;
     std::string destaddr_;
     uint16_t destport_;
     std::string bindaddr_;

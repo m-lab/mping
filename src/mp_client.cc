@@ -118,12 +118,12 @@ bool MPingClient::GoProbing(const std::string& dst_addr) {
   scoped_ptr<MpingSocket> mysock(new MpingSocket);
 
   if (mysock->Initialize(dst_addr, src_addr_, ttl_, 
-                         maxsize, win_size_, dport_, client_mode_) < 0) {
+                         maxsize, win_size_, dport_, use_server_) < 0) {
     return false;
   }
 
   // make TCP to server is in C/S mode
-  if (client_mode_ > 0) {
+  if (use_server_ > 0) {
     if (!mysock->SendHello(&client_cookie_))
       return false;
   }
@@ -134,7 +134,7 @@ bool MPingClient::GoProbing(const std::string& dst_addr) {
 
   mp_stat_.PrintStats();
 
-  if (client_mode_ > 0) {
+  if (use_server_ > 0) {
     mysock->SendDone(client_cookie_);
   }
 
@@ -286,14 +286,13 @@ bool MPingClient::WindowLoop(MpingSocket *sock) {
 }
 
 int MPingClient::GetNeedSend(int burst, bool start_burst, bool slow_start, 
-                int64_t sseq, int64_t mrseq, int intran,
-                int mustsend) const{
+                             int64_t sseq, int64_t mrseq, int intran,
+                             int mustsend) const{
   int diff;
-  int maxopen;
   int need_send;
 
   if (burst ==  0 || !start_burst) {  // no burst
-    maxopen = slow_start?2:10;
+    int maxopen = slow_start?2:10;
     diff = (int)(sseq - mrseq - intran);
     need_send = (diff < 0)?std::min(maxopen, (0-diff)):mustsend;
   } else {  // start burst, now we have built the window
@@ -423,22 +422,21 @@ bool MPingClient::IntervalLoop(int intran, MpingSocket *sock) {
   return true;
 }
 
-MPingClient::MPingClient(size_t pkt_size, int win_size, bool loop, int rate,
+MPingClient::MPingClient(size_t pkt_size, int win_size, bool loop,
                          bool slow_start, int ttl, int inc_ttl, int loop_size,
-                         int burst, uint16_t dport, uint16_t client_mode,
+                         int burst, uint16_t dport, uint16_t use_server,
                          bool print_seq_time, const std::string& src_addr,
                          const std::string& dst_host) 
     :  pkt_size_(pkt_size),
        win_size_(win_size),
        loop_(loop),
-       rate_(rate),
        slow_start_(slow_start),
        ttl_(ttl),
        inc_ttl_(inc_ttl),
        loop_size_(loop_size),
        burst_(burst),
        dport_(dport),
-       client_mode_(client_mode),
+       use_server_(use_server),
        client_cookie_(0),
        src_addr_(src_addr),
        dst_host_(dst_host),

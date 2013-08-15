@@ -10,7 +10,6 @@ char usage[] =
 "Usage:  mping [<switch> [<val>]]* <host>\n\
       -n <num>    Number of messages to keep in transit\n\
       -f          Loop forever (Don't increment # messages in transit)\n\
-      -R <rate>   Rate at which to limit number of messages in transit\n\
       -S          Use a TCP style slowstart\n\
 \n\
       -t <ttl>    Send UDP packets (instead of ICMP) with a TTL of <ttl>\n\
@@ -22,7 +21,7 @@ char usage[] =
       -B <bnum>   Send <bnum> packets in burst, should smaller than <num>\n\
       -p <port>   If UDP, destination port number\n\
 \n\
-      -c <mode>   Client mode, sending with UDP to a mping server\n\
+      -c <mode>   Use server mode, sending with UDP to a mping server\n\
                   <mode> coule be 1 and 2, 1 means server echo back\n\
                   whole pakcet, 2 means server echo back first 24 bytes\n\
       -r          Print time and sequence number of every send/recv packet\n\
@@ -38,19 +37,15 @@ char usage[] =
 }  // namespace
 
 int main(int argc, const char** argv) {
-  int ac = argc;
-  const char **av = argv;
-  const char *p;
   bool host_set = false;
 
   int win_size = 4;
-  int rate = 0;
   int ttl = 0;
   int inc_ttl = 0;
   int loop_size = 0;
   int burst = 0;
   uint16_t dport = 0;
-  uint16_t client_mode = 0;
+  uint16_t use_server = 0;
   size_t pkt_size = 0;
   bool loop = false;
   bool slow_start = false;
@@ -65,39 +60,38 @@ int main(int argc, const char** argv) {
     exit(0);
   }
 
-  ac--;
-  av++;
+  argc--;
+  argv++;
 
-  while (ac > 0) {
-    p = *av++;  // p point to switch, av point to value
+  while (argc > 0) {
+    const char *p = *argv++;  // p point to switch, av point to value
     if (p[0] == '-') {
-      if (ac == 1) {
+      if (argc == 1) {
         switch (p[1]) {  // those switches without value
-          case 'f': loop = true; av--; break;
-          case 'S': slow_start = true; av--; break;
-          case 'V': version = true; av--; break;
-          case 'd': debug = true; av--; break;
-          case 'r': print_seq_time = true; av--; break;
+          case 'f': loop = true; argv--; break;
+          case 'S': slow_start = true; argv--; break;
+          case 'V': version = true; argv--; break;
+          case 'd': debug = true; argv--; break;
+          case 'r': print_seq_time = true; argv--; break;
           default: LOG(FATAL, "\n%s", usage); break;
         }
       } else {
         switch (p[1]) {
-          case 'n': { win_size = strtol(*av, NULL, 10); ac--; break; }
-          case 'f': { loop = true; av--; break; }
-          case 'R': { rate = strtol(*av, NULL, 10); ac--; break; }
-          case 'S': { slow_start = true; av--; break; }
-          case 't': { ttl = strtol(*av, NULL, 10); ac--; break; }
-          case 'a': { inc_ttl = strtol(*av, NULL, 10); 
-                      ttl = inc_ttl; ac--; break; }
-          case 'b': { pkt_size = strtol(*av, NULL, 10); ac--; break; }
-          case 'l': { loop_size = strtol(*av, NULL, 10); ac--; break; }
-          case 'p': { dport = strtol(*av, NULL, 10); ac--; break; }
-          case 'B': { burst = strtol(*av, NULL, 10); ac--; break; }
-          case 'V': { version = true; av--; break; }
-          case 'd': { debug = true; av--; break; }
-          case 'c': { client_mode = strtol(*av, NULL, 10); ac--; break; }
-          case 'r': { print_seq_time = true; av--; break; }
-          case 'F': { src_addr = std::string(*av); ac--; break; }
+          case 'n': { win_size = strtol(*argv, NULL, 10); argc--; break; }
+          case 'f': { loop = true; argv--; break; }
+          case 'S': { slow_start = true; argv--; break; }
+          case 't': { ttl = strtol(*argv, NULL, 10); argc--; break; }
+          case 'a': { inc_ttl = strtol(*argv, NULL, 10); 
+                      ttl = inc_ttl; argc--; break; }
+          case 'b': { pkt_size = strtol(*argv, NULL, 10); argc--; break; }
+          case 'l': { loop_size = strtol(*argv, NULL, 10); argc--; break; }
+          case 'p': { dport = strtol(*argv, NULL, 10); argc--; break; }
+          case 'B': { burst = strtol(*argv, NULL, 10); argc--; break; }
+          case 'V': { version = true; argv--; break; }
+          case 'd': { debug = true; argv--; break; }
+          case 'c': { use_server = strtol(*argv, NULL, 10); argc--; break; }
+          case 'r': { print_seq_time = true; argv--; break; }
+          case 'F': { src_addr = std::string(*argv); argc--; break; }
           default: { 
             LOG(FATAL, "Unknown parameter -%c\n%s", p[1], usage); break; 
           }
@@ -106,15 +100,15 @@ int main(int argc, const char** argv) {
     } else {  // host
       if (!host_set) {
         dst_host = std::string(p);  
-        av--;
+        argv--;
         host_set = true;
       }else{
         LOG(FATAL, "%s, %s\n%s", p, dst_host.c_str(), usage);
       }
     }
 
-    ac--;
-    av++;
+    argc--;
+    argv++;
   }
 
   // validate parameters
@@ -133,12 +127,12 @@ int main(int argc, const char** argv) {
   }
 
   // client mode
-  if (client_mode > 0) {
+  if (use_server > 0) {
     if (dport == 0) {
       LOG(FATAL, "Client mode must have destination port using -p.");
     }
 
-    if (client_mode > 2) {
+    if (use_server > 2) {
       LOG(FATAL, "Client mode can only be set to 1 or 2.");
     }
 
@@ -189,7 +183,7 @@ int main(int argc, const char** argv) {
 
   // validate UDP destination port
   if (dport > 0 ) {
-    if (ttl == 0 && client_mode == 0) {
+    if (ttl == 0 && use_server == 0) {
       LOG(FATAL, "-p can only use together with -t -a or -c.\n%s", usage);
     }
 
@@ -199,9 +193,9 @@ int main(int argc, const char** argv) {
   }
 
 
-  MPingClient mpclient(pkt_size, win_size, loop, rate, slow_start, ttl, inc_ttl,
+  MPingClient mpclient(pkt_size, win_size, loop, slow_start, ttl, inc_ttl,
                        loop_size, burst, dport, 
-                       client_mode, print_seq_time, src_addr, dst_host);
+                       use_server, print_seq_time, src_addr, dst_host);
 
   mpclient.Run();
 

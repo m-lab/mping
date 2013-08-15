@@ -1,4 +1,4 @@
-#include "mp_mping.h"
+#include "mp_client.h"
 #include "mp_common.h"
 #include "mp_socket.h"
 #include "mp_stats.h"
@@ -6,34 +6,23 @@
 
 #include "gtest/gtest.h"
 
-namespace {
-  const char *myargv[] = {"mping",
-                          "-n", 
-                          "5", 
-                          "-b", 
-                          "64", 
-                          "127.0.0.1", NULL}; 
-  const int kMyArgc = 6; 
-}
-
-class MPingUnitTestBase : public MPing {
-  public: 
-    MPingUnitTestBase() : MPing(kMyArgc, myargv) { }
-};
-
-class MPingTTLTest : public MPingUnitTestBase {
+class MPingTTLTest : public MPingClient {
   public:
     int loop_count;
 
-    MPingTTLTest() : MPingUnitTestBase() { }
+    MPingTTLTest() : MPingClient(64, 5, false, false, 0, 0, 0, 0, 0, 0,
+                                 false, std::string(""), 
+                                 std::string("127.0.0.1")) { }
+
     void GoTest(int test_ttl, int test_inc_ttl) {
       scoped_ptr<MpingSocket> mysock(new MpingSocket);
-      EXPECT_GE(mysock->Initialize(std::string("127.0.0.1"), src_addr, ttl,
-                             kMinBuffer, win_size, dport, client_mode), 0);
+      EXPECT_GE(mysock->Initialize(std::string("127.0.0.1"), src_addr_, ttl_,
+                                   kMinBuffer, win_size_, dport_, 
+                                   use_server_), 0);
 
       loop_count = 0;
-      ttl = test_ttl;
-      inc_ttl = test_inc_ttl;
+      ttl_ = test_ttl;
+      inc_ttl_ = test_inc_ttl;
 
       TTLLoop(mysock.get());
     }

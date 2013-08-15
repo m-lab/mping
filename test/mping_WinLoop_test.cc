@@ -1,4 +1,4 @@
-#include "mp_mping.h"
+#include "mp_client.h"
 #include "mp_common.h"
 #include "mp_socket.h"
 #include "mp_stats.h"
@@ -6,37 +6,25 @@
 
 #include "gtest/gtest.h"
 
-namespace {
-  const char *myargv[] = {"mping",
-                          "-n", 
-                          "5", 
-                          "-b", 
-                          "64", 
-                          "127.0.0.1", NULL}; 
-  const int kMyArgc = 6; 
-}
-
-class MPingUnitTestBase : public MPing {
-  public: 
-    MPingUnitTestBase() : MPing(kMyArgc, myargv) { }
-};
-
-class MPingWinLoopTest: public MPingUnitTestBase {
+class MPingWinLoopTest: public MPingClient {
   public:
     int loop_forever_count;
     std::vector<int> win_array;
 
-    MPingWinLoopTest() : MPingUnitTestBase() { }
+    MPingWinLoopTest() : MPingClient(64, 5, false, false, 0, 0, 0, 0, 0, 0,
+                                     false, std::string(""), 
+                                     std::string("127.0.0.1")) { }
+
     void GoTest(bool isloop, int test_inc_ttl, int test_loop_size) {
       MpingSocket tempmpsock;
 
-      loop = isloop;
-      inc_ttl = test_inc_ttl;
-      loop_size = test_loop_size;
+      loop_ = isloop;
+      inc_ttl_ = test_inc_ttl;
+      loop_size_ = test_loop_size;
 
       win_array.clear();
       loop_forever_count = 0;
-      haltf = 0;
+      haltf_ = 0;
       WindowLoop(&tempmpsock);
     }
 
@@ -45,9 +33,9 @@ class MPingWinLoopTest: public MPingUnitTestBase {
       if (intran == 0)
         return true;
 
-      if (loop && inc_ttl == 0 && loop_size == 0) {
+      if (loop_ && inc_ttl_ == 0 && loop_size_ == 0) {
         if (loop_forever_count == 2)
-          haltf = 1;
+          haltf_ = 1;
         else
           loop_forever_count++;
       }
