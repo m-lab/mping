@@ -286,8 +286,8 @@ size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
   if (!use_udp_) {  // ICMP
     ASSERT(icmp_sock != NULL);
     // bzero rest of the buffer
-    bzero(buf + buffer_length_ + kAllHeaderLen - kStrHeaderLength,
-          send_size - kAllHeaderLen + kStrHeaderLength);
+//    bzero(buf + buffer_length_ + kAllHeaderLen - kStrHeaderLength,
+//          send_size - kAllHeaderLen + kStrHeaderLength);
 
     if (family_ == SOCKETFAMILY_IPV4) {
       // set checksum

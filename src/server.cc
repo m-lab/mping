@@ -48,7 +48,7 @@ int main(int argc, const char** argv) {
         }
       } else {
         switch (p[1]) {
-          case 'b': { packet_size = atoi(*av); ac--; break; }
+          case 'b': { packet_size = strtol(*av, NULL, 10); ac--; break; }
           case '6': { server_family = SOCKETFAMILY_IPV6; av--; break; }
           case 'V': version = true; av--; break;
           case 'd': debug = true; av--; break;
@@ -59,7 +59,7 @@ int main(int argc, const char** argv) {
       }
     } else {  // port
       if (!port_set) {
-        server_port = atoi(p);  
+        server_port = strtol(p, NULL, 10);
         av--;
         port_set = true;
       }else{
@@ -73,7 +73,7 @@ int main(int argc, const char** argv) {
   }
 
   if (version) {
-    std::cout << kServerVersion << std::endl;
+    std::cout << kVersion << std::endl;
     exit(0);
   }
 

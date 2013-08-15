@@ -50,16 +50,16 @@ class MPingServer {
     uint16_t GenerateClientCookie();
     ClientStateNode *CheckClient(uint16_t client_cookie);
     void DeleteClient(uint16_t client_cookie);
-    void InsertClient(uint16_t client_cookie, ClientStateNode *node);
+    uint16_t InsertClient(ClientStateNode *node);
     void PrintClientStats(ClientStateNode *node) const;
 
     size_t packet_size_;
     uint16_t server_port_;
     SocketFamily server_family_;
     std::vector<std::pair<uint16_t, ClientStateNode*> > client_map_;
-    pthread_mutex_t MuxClientMap_;
+    pthread_mutex_t client_map_mutex_;
     pthread_mutex_t MuxLog_;
-
+    uint32_t client_cookie_num;
 };
 
 #endif

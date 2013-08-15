@@ -1,4 +1,5 @@
 #include <byteswap.h>
+#include <errno.h>
 
 #include "mp_common.h"
 
@@ -20,32 +21,22 @@ const char *kTCPConfirmMessage = "CFRM";
 const size_t kMPTCPMessageSize = sizeof(MPTCPMessage);
 const time_t kDefaultCleanUpTime = 300;  // seconds
 //TODO(xunfan): compare client and server version to ensure compatibility
-const char *kClientVersion = "mping_server version: 2.1 (2013.08)";
-const char *kServerVersion = "mping_client version: 2.1 (2013.08)";
+const char *kVersion = "2.1 (2013.08)";
 
 bool IsBigEndian() {
   int i = 1;
-  if (*((char*)&i))
-    return false;
-  else
-    return true;
+  return ((char)i) == 0;
 }
 
 uint64_t MPhton64(uint64_t int_host, bool is_big_end) {
-  if (is_big_end)
-    return int_host;
-  else
-    return bswap_64(int_host);
+  return is_big_end ? int_host : bswap_64(int_host);
 }
 
 uint64_t MPntoh64(uint64_t int_net, bool is_big_end) {
-  if (is_big_end)
-    return int_net;
-  else
-    return bswap_64(int_net);
+  return is_big_end ? int_net : bswap_64(int_net);
 }
 
-MPTCPMessageCode GetTCPMsgCodeFromString(std::string str_code) {
+MPTCPMessageCode GetTCPMsgCodeFromString(const std::string& str_code) {
   if (str_code == kTCPHelloMessage)
     return MPTCP_HELLO;
 
@@ -55,20 +46,15 @@ MPTCPMessageCode GetTCPMsgCodeFromString(std::string str_code) {
   if (str_code == kTCPConfirmMessage)
     return MPTCP_CONFIRM;
 
+  LOG(ERROR, "unknown TCP message code.");
   return MPTCP_UNKNOWN;
 }
 
 ServerEchoMode GetTCPServerEchoModeFromShort(uint16_t type) {
-  if (type == 0x01)
-    return ECHOMODE_WHOLE;
+  if (type >= NUM_ECHO_MODES)
+    return ECHOMODE_UNSPEC;
 
-  if (type == 0x02)
-    return ECHOMODE_SMALL;
-
-  if (type == 0x03)
-    return ECHOMODE_LARGE;
-
-  return ECHOMODE_UNSPEC;
+  return (ServerEchoMode)type;
 }
 
 ssize_t StreamSocketSendWithTimeout(int sock, const char* buffer, size_t size) {

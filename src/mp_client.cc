@@ -1,4 +1,10 @@
 #include <errno.h>
+
+#ifndef __STDC_FORMAT_MACROS  // for print int64_t with PRIxx Macros
+#define __STDC_FORMAT_MACROS
+#endif
+#include <inttypes.h>
+
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,6 +29,7 @@ const int kNbTab[] = {64, 100, 500, 1000, 1500, 2000, 3000, 4000, 0};
 // when testing, only send these packets every sec
 const int kMaximumOutPacketsInTest = 20;
 }  // namespace
+
 int MPingClient::haltf_ = 0;
 long MPingClient::tick_ = 0;
 bool MPingClient::timedout_ = false;

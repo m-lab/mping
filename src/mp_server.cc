@@ -20,7 +20,7 @@ namespace {
 struct CompareClientCookie {
   bool operator() (const std::pair<uint16_t, ClientStateNode*>& p,
                    uint16_t c) {
-    return (p.first < c);
+    return p.first < c;
   }
 };
 }  // namespace
@@ -29,7 +29,8 @@ MPingServer::MPingServer(size_t packet_size, uint16_t server_port,
                          SocketFamily server_family) 
     : packet_size_(std::max(packet_size, kMinBuffer)),
       server_port_(server_port),
-      server_family_(server_family) { }
+      server_family_(server_family),
+      client_cookie_num(0) { }
 
 void MPingServer::Run() {
   MPLOG(MPLOG_DEF, "Running server mode, port %u.", server_port_);
@@ -39,7 +40,7 @@ void MPingServer::Run() {
   pthread_t udp_thread;
   pthread_t cleanup_thread;
 
-  pthread_mutex_init(&MuxClientMap_, NULL);
+  pthread_mutex_init(&client_map_mutex_, NULL);
   pthread_mutex_init(&MuxLog_, NULL);
 
   if (pthread_create(&tcp_thread, 0, &TCPThread, this) != 0) {
@@ -56,21 +57,24 @@ void MPingServer::Run() {
   }
 
   LOG(INFO, "Waiting threads to exit.");
-  pthread_join(tcp_thread, NULL);
-  pthread_join(udp_thread, NULL);
-  pthread_join(cleanup_thread, NULL);
+//  pthread_join(tcp_thread, NULL);
+//  pthread_join(udp_thread, NULL);
+//  pthread_join(cleanup_thread, NULL);
+  pthread_exit(NULL);
 }
 
 uint16_t MPingServer::GenerateClientCookie() {
-  srand(time(NULL));
-  uint16_t r = rand() % 65535;
+  client_cookie_num++;
+
+  uint16_t r = client_cookie_num % 65535;
 
   if (client_map_.empty())
     return r;
 
   int generate_time = 0;
   while (CheckClient(r) != NULL) {
-    r = rand() % 65535;
+    client_cookie_num++;
+    r = client_cookie_num % 65535;
     generate_time++;
 
     if (generate_time >= 65535)
@@ -86,40 +90,54 @@ void MPingServer::PrintClientStats(ClientStateNode *node) const {
 }
 
 void MPingServer::DeleteClient(uint16_t client_cookie) {
+  pthread_mutex_lock(&client_map_mutex_);
   std::vector<std::pair<uint16_t, ClientStateNode*> >::iterator it =
         std::lower_bound(client_map_.begin(), client_map_.end(),
                          client_cookie, CompareClientCookie());
 
-  if ((*it).first == client_cookie) {
-    PrintClientStats((*it).second);
-    delete (*it).second;
+  if (it != client_map_.end()) {
+    if (it->first != client_cookie) {
+      pthread_mutex_unlock(&client_map_mutex_);
+      LOG(FATAL, "Bad comparator.");
+    }
+
+    PrintClientStats(it->second);
+    delete it->second;
     client_map_.erase(it);
+    pthread_mutex_unlock(&client_map_mutex_);
   } else {
+    pthread_mutex_unlock(&client_map_mutex_);
     LOG(ERROR, "Client to be deleted is not in client map.");
   }
 }
 
-void MPingServer::InsertClient(uint16_t client_cookie,
-                               ClientStateNode *node) {
+uint16_t MPingServer::InsertClient(ClientStateNode *node) {
+  pthread_mutex_lock(&client_map_mutex_);
+
+  uint16_t client_cookie = GenerateClientCookie();
+
   if (client_map_.empty()) {
-    client_map_.insert(client_map_.begin(),
-                      std::pair<uint16_t, ClientStateNode*>(client_cookie,
-                                                            node));
-    return;
+    client_map_.push_back(std::pair<uint16_t, ClientStateNode*>(client_cookie,
+                                                                node));
+    pthread_mutex_unlock(&client_map_mutex_);
+    return client_cookie;
   }
 
   std::vector<std::pair<uint16_t, ClientStateNode*> >::iterator it = 
         std::lower_bound(client_map_.begin(), client_map_.end(),
                          client_cookie, CompareClientCookie());
 
-  if ((*it).first == client_cookie) {
+  if (it->first == client_cookie) {
     LOG(ERROR, "Client already exist in client map.");
-    return;
+    pthread_mutex_unlock(&client_map_mutex_);
+    return client_cookie;
   }
 
   client_map_.insert(it, 
                     std::pair<uint16_t, ClientStateNode*>(client_cookie,
                                                           node));
+  pthread_mutex_unlock(&client_map_mutex_);
+  return client_cookie;
 }
 
 ClientStateNode *MPingServer::CheckClient(uint16_t client_cookie) {
@@ -130,8 +148,8 @@ ClientStateNode *MPingServer::CheckClient(uint16_t client_cookie) {
         std::lower_bound(client_map_.begin(), client_map_.end(),
                          client_cookie, CompareClientCookie());
 
-  if ((*it).first == client_cookie)
-    return (*it).second;
+  if (it->first == client_cookie)
+    return it->second;
   else
     return NULL;
 }
@@ -143,23 +161,21 @@ void *MPingServer::CleanupThread(void *that) {
   while (1) {
     gettimeofday(&now, 0);
 
-    pthread_mutex_lock(&self->MuxClientMap_);
+    pthread_mutex_lock(&self->client_map_mutex_);
 
-    size_t mapsize = self->client_map_.size();
-    if (mapsize > 0) {
-      for (size_t i = 0; i < mapsize; i++) {
-        if (now.tv_sec - self->client_map_.at(i).second->last_recv_time.tv_sec >
-            kDefaultCleanUpTime) {
-          self->PrintClientStats(self->client_map_.at(i).second);
-          delete self->client_map_.at(i).second;  // free memory
-          self->client_map_.erase(self->client_map_.begin() + i);
-          mapsize--;
-          i--;
-        }
+    for (std::vector<std::pair<uint16_t, ClientStateNode*> >::iterator iter = 
+              self->client_map_.begin(); iter != self->client_map_.end();) {
+      if (now.tv_sec - iter->second->last_recv_time.tv_sec >
+          kDefaultCleanUpTime) {
+        self->PrintClientStats(iter->second);
+        delete iter->second;
+        iter = self->client_map_.erase(iter);
+      } else {
+        ++iter;
       }
     }
 
-    pthread_mutex_unlock(&self->MuxClientMap_);
+    pthread_mutex_unlock(&self->client_map_mutex_);
 
     sleep(static_cast<unsigned int>(kDefaultCleanUpTime));
   }
@@ -230,14 +246,16 @@ void *MPingServer::UDPThread(void *that) {
           ntohs(*(reinterpret_cast<const uint16_t*>(recv_packet.buffer() +
                                                     kCookieOffset)));
 
-    pthread_mutex_lock(&self->MuxClientMap_);
+    pthread_mutex_lock(&self->client_map_mutex_);
     ClientStateNode *statenode = self->CheckClient(my_cookie);
-    pthread_mutex_unlock(&self->MuxClientMap_);
+    if (statenode != NULL) {
+      gettimeofday(&now, 0);
+      statenode->last_recv_time = now;
+    }
+    pthread_mutex_unlock(&self->client_map_mutex_);
 
     if (statenode == NULL) {
-      pthread_mutex_lock(&self->MuxLog_);
       LOG(ERROR, "recv UDP packet from unregistered client.");
-      pthread_mutex_unlock(&self->MuxLog_);
       continue;
     }
 
@@ -247,7 +265,6 @@ void *MPingServer::UDPThread(void *that) {
       statenode->unexpected++;
       continue;
     }
-
 
     statenode->total_recv++;
 
@@ -275,9 +292,8 @@ void *MPingServer::UDPThread(void *that) {
                       &num_bytes);
          break;
       }
-      case ECHOMODE_LARGE: {  // now LARGE is the same as SMALL
-         mysock->Send(mlab::Packet(recv_packet.buffer(), kAllHeaderLen),
-                      &num_bytes);
+      case ECHOMODE_LARGE: {  // not implemented
+         LOG(FATAL, "ECHOMODE_LARGE not implemented.");
          break;
       }
       default: {
@@ -286,8 +302,6 @@ void *MPingServer::UDPThread(void *that) {
       }
     }
     statenode->sent_back++;
-    gettimeofday(&now, 0);
-    statenode->last_recv_time = now;
   }
 
   return NULL;
@@ -333,13 +347,8 @@ void *MPingServer::TCPThread(void *that) {
             new ClientStateNode(GetTCPServerEchoModeFromShort(
                 ntohs(tcpmsg->msg_type)), now);
 
-        pthread_mutex_lock(&self->MuxClientMap_);
-        // get cookie first
-        uint16_t cookie = self->GenerateClientCookie();
-
         // insert to client map
-        self->InsertClient(cookie, node);
-        pthread_mutex_unlock(&self->MuxClientMap_);
+        uint16_t cookie = self->InsertClient(node);
 
         // send TCP confirm, cookie is the msg_value
         MPTCPMessage cfrm_msg(MPTCP_CONFIRM, ntohs(tcpmsg->msg_type),
@@ -353,9 +362,7 @@ void *MPingServer::TCPThread(void *that) {
         break;
       }
       case MPTCP_DONE: {
-        pthread_mutex_lock(&self->MuxClientMap_);
         self->DeleteClient(ntohs(tcpmsg->msg_value));
-        pthread_mutex_unlock(&self->MuxClientMap_);
         break;
       }
       default: {

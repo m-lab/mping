@@ -1,4 +1,10 @@
 #include <climits>
+
+#ifndef __STDC_FORMAT_MACROS  // for print int64_t with PRIxx Macros
+#define __STDC_FORMAT_MACROS
+#endif
+#include <inttypes.h>
+
 #include <iostream>
 #include <iomanip>
 

@@ -46,8 +46,8 @@ class MPingClient{
     virtual bool WindowLoop(MpingSocket* sock);
     virtual bool IntervalLoop(int intran, MpingSocket* sock);
     int GetNeedSend(int burst, bool start_burst, bool slow_start,
-                int64_t sseq, int64_t mrseq, int intran,
-                int mustsend) const;
+                    int64_t sseq, int64_t mrseq, int intran,
+                    int mustsend) const;
 
     static void ring(int signo);
     static void halt(int signo);

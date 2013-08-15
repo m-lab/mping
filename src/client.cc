@@ -82,19 +82,20 @@ int main(int argc, const char** argv) {
         }
       } else {
         switch (p[1]) {
-          case 'n': { win_size = atoi(*av); ac--; break; }
+          case 'n': { win_size = strtol(*av, NULL, 10); ac--; break; }
           case 'f': { loop = true; av--; break; }
-          case 'R': { rate = atoi(*av); ac--; break; }
+          case 'R': { rate = strtol(*av, NULL, 10); ac--; break; }
           case 'S': { slow_start = true; av--; break; }
-          case 't': { ttl = atoi(*av); ac--; break; }
-          case 'a': { inc_ttl = atoi(*av); ttl = inc_ttl; ac--; break; }
-          case 'b': { pkt_size = atoi(*av); ac--; break; }
-          case 'l': { loop_size = atoi(*av); ac--; break; }
-          case 'p': { dport = atoi(*av); ac--; break; }
-          case 'B': { burst = atoi(*av); ac--; break; }
+          case 't': { ttl = strtol(*av, NULL, 10); ac--; break; }
+          case 'a': { inc_ttl = strtol(*av, NULL, 10); 
+                      ttl = inc_ttl; ac--; break; }
+          case 'b': { pkt_size = strtol(*av, NULL, 10); ac--; break; }
+          case 'l': { loop_size = strtol(*av, NULL, 10); ac--; break; }
+          case 'p': { dport = strtol(*av, NULL, 10); ac--; break; }
+          case 'B': { burst = strtol(*av, NULL, 10); ac--; break; }
           case 'V': { version = true; av--; break; }
           case 'd': { debug = true; av--; break; }
-          case 'c': { client_mode = atoi(*av); ac--; break; }
+          case 'c': { client_mode = strtol(*av, NULL, 10); ac--; break; }
           case 'r': { print_seq_time = true; av--; break; }
           case 'F': { src_addr = std::string(*av); ac--; break; }
           default: { 
@@ -118,7 +119,7 @@ int main(int argc, const char** argv) {
 
   // validate parameters
   if (version) {
-    std::cout << kClientVersion << std::endl;
+    std::cout << kVersion << std::endl;
     exit(0);
   }
 

@@ -1,13 +1,7 @@
 #ifndef _MPING_COMMON_H_
 #define _MPING_COMMON_H_
 
-#ifndef __STDC_FORMAT_MACROS  // for print int64_t with PRIxx Macros
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <arpa/inet.h>
-#include <errno.h>
-#include <inttypes.h>
 #include <string.h>
 
 #include <string>
@@ -28,14 +22,16 @@ extern const char *kTCPDoneMessage;
 extern const char *kTCPConfirmMessage;
 extern const size_t kMPTCPMessageSize;
 extern const time_t kDefaultCleanUpTime;
-extern const char *kClientVersion;
-extern const char *kServerVersion;
+extern const char *kVersion;
 
 bool IsBigEndian();
 uint64_t MPhton64(uint64_t int_host, bool is_big_end);
 uint64_t MPntoh64(uint64_t int_net, bool is_big_end);
 
 // server echo mode
+
+#define NUM_ECHO_MODES 4
+
 enum ServerEchoMode {
   ECHOMODE_UNSPEC,
   ECHOMODE_WHOLE,
@@ -75,7 +71,7 @@ struct MPTCPMessage {
   }
 };
 
-MPTCPMessageCode GetTCPMsgCodeFromString(std::string str_code);
+MPTCPMessageCode GetTCPMsgCodeFromString(const std::string& str_code);
 ServerEchoMode GetTCPServerEchoModeFromShort(uint16_t type);
 
 ssize_t StreamSocketSendWithTimeout(int sock, const char* buffer, size_t size);
