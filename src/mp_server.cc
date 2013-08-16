@@ -30,15 +30,15 @@ MPingServer::MPingServer(size_t packet_size, uint16_t server_port,
     : packet_size_(std::max(packet_size, kMinBuffer)),
       server_port_(server_port),
       server_family_(server_family),
-      client_cookie_num(0) { }
+      client_cookie_num(0) { 
+  pthread_mutex_init(&client_map_mutex_, NULL);
+  pthread_mutex_init(&MuxLog_, NULL);
+}
 
 void MPingServer::Run() {
   MPLOG(MPLOG_DEF, "Running server mode, port %u.", server_port_);
 
   // start threads for two sockets and regular clean up
-
-  pthread_mutex_init(&client_map_mutex_, NULL);
-  pthread_mutex_init(&MuxLog_, NULL);
 
   pthread_t tcp_thread;
   if (pthread_create(&tcp_thread, 0, &TCPThread, this) != 0) {
@@ -346,7 +346,9 @@ void *MPingServer::TCPThread(void *that) {
         uint16_t cookie = self->InsertClient(node);
 
         // send TCP confirm, cookie is the msg_value
-        MPTCPMessage cfrm_msg(MPTCP_CONFIRM, ntohs(tcpmsg->msg_type),
+        MPTCPMessage cfrm_msg(MPTCP_CONFIRM, 
+                              GetTCPServerEchoModeFromShort(
+                                  ntohs(tcpmsg->msg_type)),
                               cookie);
   
         if (StreamSocketSendWithTimeout(mysock->client_raw(), 

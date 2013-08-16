@@ -43,6 +43,7 @@ class MPingServer {
     void Run();
 
   private:
+    FRIEND_TEST(MPingServerTest, CookieTest);
     static void *TCPThread(void *that);
     static void *UDPThread(void *that);
     static void *CleanupThread(void *that);

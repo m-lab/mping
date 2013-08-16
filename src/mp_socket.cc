@@ -509,23 +509,24 @@ bool MpingSocket::SendHello(uint16_t *cookie) {
     return false;
   }
 
-  // send hello
-  MPTCPMessage msg(MPTCP_HELLO, use_server_, 0);
+  scoped_ptr<mlab::ClientSocket> sock_ptr(c_sock);
 
-  if (StreamSocketSendWithTimeout(c_sock->raw(), 
+  // send hello
+  MPTCPMessage msg(MPTCP_HELLO, 
+                   GetTCPServerEchoModeFromShort(use_server_), 0);
+
+  if (StreamSocketSendWithTimeout(sock_ptr->raw(), 
                                   reinterpret_cast<const char*>(&msg),
                                   kMPTCPMessageSize) < 0) {
     LOG(ERROR, "TCP send 'Hello' message fails.");
-    delete c_sock;
     return false;
   }
   
   // receive confirm
   char recv_buf[kMPTCPMessageSize];
-  if (StreamSocketRecvWithTimeout(c_sock->raw(),
+  if (StreamSocketRecvWithTimeout(sock_ptr->raw(),
                                   recv_buf, kMPTCPMessageSize) < 0) {
     LOG(ERROR, "TCP receive 'Confirm' message fails.");
-    delete c_sock;
     return false;
   }
 
@@ -534,14 +535,12 @@ bool MpingSocket::SendHello(uint16_t *cookie) {
   // sanity check
   if (std::string(msg_ptr->msg_code, 4) != kTCPConfirmMessage) {
     LOG(ERROR, "Received TCP message is not 'Confirm'.");
-    delete c_sock;
     return false;
   }
 
   // get cookie
   *cookie = ntohs(msg_ptr->msg_value);
 
-  delete c_sock;
   return true;
 }
 
@@ -562,13 +561,14 @@ void MpingSocket::SendDone(uint16_t cookie) {
     return;
   }
 
+  scoped_ptr<mlab::ClientSocket> sock_ptr(c_sock);
+
   // Send Done
-  MPTCPMessage msg(MPTCP_DONE, 0, cookie);
-  if (StreamSocketSendWithTimeout(c_sock->raw(),
+  MPTCPMessage msg(MPTCP_DONE, 
+                   GetTCPServerEchoModeFromShort(use_server_), cookie);
+  if (StreamSocketSendWithTimeout(sock_ptr->raw(),
                                   reinterpret_cast<const char*>(&msg),
                                   kMPTCPMessageSize) < 0) {
     LOG(ERROR, "TCP send 'Done' message fails.");
   }
-
-  delete c_sock;
 }

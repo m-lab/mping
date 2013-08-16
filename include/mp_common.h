@@ -50,7 +50,7 @@ struct MPTCPMessage {
   uint16_t msg_type;
   uint16_t msg_value;
 
-  MPTCPMessage(MPTCPMessageCode code, uint16_t type, uint16_t value) 
+  MPTCPMessage(MPTCPMessageCode code, ServerEchoMode type, uint16_t value) 
     : msg_type(htons(type)),
       msg_value(htons(value)) {
     switch (code) {
