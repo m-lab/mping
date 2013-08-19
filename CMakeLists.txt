@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 2.6)
 
 project (mping)
 
+find_package(Threads REQUIRED)
+
 set(PROJECT_ROOT_DIR ${PROJECT_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_ROOT_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_ROOT_DIR}/lib)
@@ -10,7 +12,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_ROOT_DIR}/lib)
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
 # Set up directories
-set(MLAB_LIBRARIES_ROOT ${PROJECT_ROOT_DIR}/third_party/m-lab.libraries/trunk)
+set(MLAB_LIBRARIES_ROOT ${PROJECT_ROOT_DIR}/third_party/m-lab.libraries/)
 set(GTEST_ROOT ${MLAB_LIBRARIES_ROOT}/third_party/gtest-1.6.0)
 
 set(CMAKE_CXX_FLAGS "-Wall -Werror -fPIC -fno-exceptions -fno-rtti")
@@ -26,25 +28,27 @@ endif()
 
 include_directories(
   ${PROJECT_ROOT_DIR}/include
-  ${PROJECT_ROOT_DIR}/src
   ${MLAB_LIBRARIES_ROOT}/include
   ${GTEST_ROOT}/include)
-
-file(GLOB_RECURSE SRC_FILES src/*.cc)
-
 
 link_directories(
   ${MLAB_LIBRARIES_ROOT}/lib
   ${GTEST_ROOT}/lib)
  
-file(GLOB_RECURSE SRC_FILES src/*.cc)
+file(GLOB MPSERVER_SRC_FILES src/mp_server.cc src/server.cc src/mp_common.cc
+     src/mp_log.cc)
+   
+file(GLOB MPCLIENT_SRC_FILES src/mp_client.cc src/client.cc src/mp_common.cc
+     src/mp_log.cc src/mp_socket.cc src/mp_stats.cc)
 
 # Build the libraries first
 add_subdirectory(${MLAB_LIBRARIES_ROOT})
 
 # Build 
-add_executable(mping ${SRC_FILES})
-target_link_libraries(mping mlab)
+add_executable(mping_client ${MPCLIENT_SRC_FILES})
+add_executable(mping_server ${MPSERVER_SRC_FILES})
+target_link_libraries(mping_client mlab)
+target_link_libraries(mping_server mlab ${CMAKE_THREAD_LIBS_INIT})
 
 # Build supplement targets
 add_subdirectory(test)

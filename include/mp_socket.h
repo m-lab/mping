@@ -14,36 +14,42 @@
 
 #ifndef _MP_SOCKET_H_
 #define _MP_SOCKET_H_
+#include <string.h>
 
 #include "mlab/client_socket.h"
 #include "mlab/socket_family.h"
 #include "mlab/raw_socket.h"
+#include "mp_common.h"
 #include "mp_stats.h"
-#include "log.h"
 
 class MpingSocket {
   public:
-    
     MpingSocket() :
       icmp_sock(NULL),
       udp_sock(NULL),
       family_(SOCKETFAMILY_UNSPEC),
       buffer_length_(0),
       use_udp_(false),
-      client_mode_(false) {
+      use_server_(0),
+      destport_(0) {
         memset(&srcaddr_, 0, sizeof(srcaddr_));
         memset(buffer_, 0, sizeof(buffer_));
-      }
+    }
     
     int Initialize(const std::string& destip, const std::string& srcip,
                    int ttl, size_t pktsize, int wndsize, 
-                   uint16_t port, bool clientmode);
+                   uint16_t port, uint16_t useserver);
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const unsigned int& seq, size_t size, int *error) const;
-    unsigned int ReceiveAndGetSeq(int* error, MpingStat *mpstat);
+    size_t SendPacket(const int64_t& seq, uint16_t client_cookie,
+                      size_t size, int *error) const;
+    int64_t ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
+
+    // TCP communication with server end
+    bool SendHello(uint16_t *cookie);
+    void SendDone(uint16_t cookie);
 
   protected:
     mlab::RawSocket *icmp_sock;
@@ -58,8 +64,11 @@ class MpingSocket {
     char buffer_[64];
     int buffer_length_;
     bool use_udp_;
-    bool client_mode_;
+    uint16_t use_server_;
     std::string fromaddr_;
+    std::string destaddr_;
+    uint16_t destport_;
+    std::string bindaddr_;
 };
 
 #endif

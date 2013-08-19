@@ -16,10 +16,13 @@
 #define _MPING_STATS_H_
 
 #include <vector>
-#include <time.h>
+
+#include <sys/time.h>
+
+#include "mp_common.h"
 
 struct SendQueueNode {
-  unsigned int seq;
+  int64_t seq;
   struct timeval send_time;
   struct timeval recv_time;
 //  unsigned int num_pkt_in_net;  // number of packet in flight when sent
@@ -27,55 +30,76 @@ struct SendQueueNode {
 
 class MpingStat {
   public:
-    MpingStat(const int& win_size) : 
-      unexpect_num_(0),
-      unexpect_num_temp_(0),
-      max_recv_seq_(1),
-      out_of_order_(0),
-      out_of_order_temp_(0),
-      recv_num_(0),
-      recv_num_temp_(0),
-      recv_unique_num_(0),
-      recv_unique_num_temp_(0),
-      send_num_(0),
-      send_num_temp_(0),
-      duplicate_num_(0),
-      duplicate_num_temp_(0),
-      lost_num_(0),
-      lost_num_temp_(0),
-      window_size_(win_size),
-      send_queue_size_(4 * win_size) { 
-      send_queue.reserve(sizeof(SendQueueNode) * 4 * window_size_);
+    MpingStat(int win_size, bool print_sequence_time)
+      : unexpect_num_(0),
+        unexpect_num_temp_(0),
+        max_recv_seq_(1),
+        out_of_order_(0),
+        out_of_order_temp_(0),
+        recv_num_(0),
+        recv_num_temp_(0),
+        recv_unique_num_(0),
+        recv_unique_num_temp_(0),
+        send_num_(0),
+        send_num_temp_(0),
+        duplicate_num_(0),
+        duplicate_num_temp_(0),
+        lost_num_(0),
+        lost_num_temp_(0),
+        window_size_(0),
+        send_queue_size_(4 * win_size), // Delay > 4 RTT means packet drop.
+        started_(false),
+        print_seq_time_(print_sequence_time) { 
+      send_queue_.reserve(send_queue_size_);
+
+      if (print_seq_time_) {
+        ReserveTimeSeqVectors();
+      }
     }
 
-    void EnqueueSend(unsigned int seq, struct timeval time);
-    void EnqueueRecv(unsigned int seq, struct timeval time); 
+    void EnqueueSend(int64_t seq, struct timeval time);
+    void EnqueueRecv(int64_t seq, struct timeval time); 
     void LogUnexpected();
 
     void PrintStats();
     void PrintTempStats();
     void PrintTimeLine() const;
+    void PrintResearch() const;
 
+    std::vector<int64_t> timeline_;
+    std::vector<uint64_t> time_of_packets_;  // relative time 
+                                            // to start_time in usec
+    std::vector<int64_t> seq_of_packets_;
+    
   protected:
-    unsigned int unexpect_num_;
-    unsigned int unexpect_num_temp_;
-    unsigned int max_recv_seq_;
-    unsigned int out_of_order_;
-    unsigned int out_of_order_temp_;
-    unsigned int recv_num_;
-    unsigned int recv_num_temp_;
-    unsigned int recv_unique_num_;
-    unsigned int recv_unique_num_temp_;
-    unsigned int send_num_;
-    unsigned int send_num_temp_;
-    unsigned int duplicate_num_;
-    unsigned int duplicate_num_temp_;
-    unsigned int lost_num_;
-    unsigned int lost_num_temp_;
+    int64_t unexpect_num_;
+    int64_t unexpect_num_temp_;
+    int64_t max_recv_seq_;
+    int64_t out_of_order_;
+    int64_t out_of_order_temp_;
+    int64_t recv_num_;
+    int64_t recv_num_temp_;
+    int64_t recv_unique_num_;
+    int64_t recv_unique_num_temp_;
+    int64_t send_num_;
+    int64_t send_num_temp_;
+    int64_t duplicate_num_;
+    int64_t duplicate_num_temp_;
+    int64_t lost_num_;
+    int64_t lost_num_temp_;
     int window_size_;
-    unsigned int send_queue_size_;
-    std::vector<struct SendQueueNode> send_queue;
-    std::vector<int> timeline;
+    int send_queue_size_;
+    std::vector<struct SendQueueNode> send_queue_;
+
+  private:
+    void ReserveTimeSeqVectors();
+    void InsertSequenceTime(int64_t seq, const struct timeval& now);
+    void InsertIntervalBoundary(const struct timeval& now);
+
+    bool started_;
+    bool print_seq_time_;
+    struct timeval start_time_;
+    std::vector<uint64_t> interval_boundary_;
 };
 
 #endif

@@ -12,7 +12,7 @@ while(<>) {
 
   if ($line =~ m/^\[/) {
     if ($line =~ m/^\[I\]/) {
-      if ($line =~ m/packet size ([^\,]+)\, window size (\d+)/) {
+      if ($line =~ m/packet_size\:([^\;]+)\;window_size\:(\d+)/) {
         $cur_pktsize = $1;
         $cur_winsize = $2;
 
@@ -31,7 +31,7 @@ while(<>) {
       }
     }
   } else {
-    if ($line =~ m/^Sent (\d+) received (\d+)/) {
+    if ($line =~ m/^sent\:(\d+)\;received\:(\d+)/) {
       my $sent = $1;
       my $recv = $2;
       next if ($sent == 0);
