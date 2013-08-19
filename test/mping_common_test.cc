@@ -8,48 +8,41 @@
 #include "mlab/listen_socket.h"
 #include "mlab/client_socket.h"
 
-TEST(MpingCommonTest, CheckEndianTest) {
-  if (IsBigEndian())
-    EXPECT_EQ(1u, htonl(1));
-  else
-    EXPECT_GT(htonl(1), 1u);
-}
-
 TEST(MpingCommonTest, HostNetConversion) {
   if (htonl(1) == 1) {
-    EXPECT_EQ(MPhton64(1), 1u);
-    EXPECT_EQ(MPntoh64(1), 1u);
+    EXPECT_EQ(1u, MPhton64(1));
+    EXPECT_EQ(1u, MPntoh64(1));
   } else {
-    EXPECT_GT(MPhton64(1), 1u);
-    EXPECT_GT(MPntoh64(1), 1u);
+    EXPECT_EQ(0x0100000000000000u, MPhton64(1));
+    EXPECT_EQ(0x0100000000000000u, MPntoh64(1));
   }
 }
 
 TEST(MpingCommonTest, GetTCPMsgCodeFromStringTest) {
-  EXPECT_EQ(GetTCPMsgCodeFromString(kTCPHelloMessage), MPTCP_HELLO);
-  EXPECT_EQ(GetTCPMsgCodeFromString(kTCPDoneMessage), MPTCP_DONE);
-  EXPECT_EQ(GetTCPMsgCodeFromString(kTCPConfirmMessage), MPTCP_CONFIRM);
-  EXPECT_EQ(GetTCPMsgCodeFromString("ABCDE"), MPTCP_UNKNOWN);
+  EXPECT_EQ(MPTCP_HELLO, GetTCPMsgCodeFromString(kTCPHelloMessage));
+  EXPECT_EQ(MPTCP_DONE, GetTCPMsgCodeFromString(kTCPDoneMessage));
+  EXPECT_EQ(MPTCP_CONFIRM, GetTCPMsgCodeFromString(kTCPConfirmMessage));
+  EXPECT_EQ(MPTCP_UNKNOWN, GetTCPMsgCodeFromString("ABCDE"));
 }
 
 TEST(MpingCommonTest, GetTCPServerEchoModeFromShortTest) {
-  EXPECT_EQ(GetTCPServerEchoModeFromShort(1), ECHOMODE_WHOLE);
-  EXPECT_EQ(GetTCPServerEchoModeFromShort(2), ECHOMODE_SMALL);
-  EXPECT_EQ(GetTCPServerEchoModeFromShort(3), ECHOMODE_LARGE);
-  EXPECT_EQ(GetTCPServerEchoModeFromShort(4), ECHOMODE_UNSPEC);
-  EXPECT_EQ(GetTCPServerEchoModeFromShort(0), ECHOMODE_UNSPEC);
+  EXPECT_EQ(ECHOMODE_WHOLE, GetTCPServerEchoModeFromShort(1));
+  EXPECT_EQ(ECHOMODE_SMALL, GetTCPServerEchoModeFromShort(2));
+  EXPECT_EQ(ECHOMODE_LARGE, GetTCPServerEchoModeFromShort(3));
+  EXPECT_EQ(ECHOMODE_UNSPEC, GetTCPServerEchoModeFromShort(4));
+  EXPECT_EQ(ECHOMODE_UNSPEC, GetTCPServerEchoModeFromShort(0));
 }
 
 TEST(MpingCommonTest, MPTCPMessagTest) {
   MPTCPMessage msg(MPTCP_HELLO, ECHOMODE_WHOLE, 0);
-  EXPECT_STREQ(msg.msg_code, kTCPHelloMessage);
-  EXPECT_EQ(GetTCPServerEchoModeFromShort(ntohs(msg.msg_type)), ECHOMODE_WHOLE);
+  EXPECT_STREQ(kTCPHelloMessage, msg.msg_code);
+  EXPECT_EQ(ECHOMODE_WHOLE, GetTCPServerEchoModeFromShort(ntohs(msg.msg_type)));
 
   MPTCPMessage msg1(MPTCP_DONE, ECHOMODE_WHOLE, 0);
-  EXPECT_STREQ(msg1.msg_code, kTCPDoneMessage);
+  EXPECT_STREQ(kTCPDoneMessage, msg1.msg_code);
 
   MPTCPMessage msg2(MPTCP_CONFIRM, ECHOMODE_WHOLE, 1);
-  EXPECT_STREQ(msg2.msg_code, kTCPConfirmMessage);
+  EXPECT_STREQ(kTCPConfirmMessage, msg2.msg_code);
 }
 
 TEST(MpingCommonTest, SocketSendRecvTest) {
@@ -64,10 +57,10 @@ TEST(MpingCommonTest, SocketSendRecvTest) {
   std::string send_str("MpingCommonTest, SocketSendRecvTest"); 
 
   char recv_buffer[64] = "";
-  EXPECT_EQ(StreamSocketSendWithTimeout(c_sock->raw(),
-                                        send_str.c_str(), send_str.size()), 0);
-  EXPECT_EQ(StreamSocketRecvWithTimeout(a_sock->client_raw(), recv_buffer, 
-                                        send_str.size()), 0);
+  EXPECT_EQ(0, StreamSocketSendWithTimeout(c_sock->raw(),
+                                           send_str.c_str(), send_str.size()));
+  EXPECT_EQ(0, StreamSocketRecvWithTimeout(a_sock->client_raw(), recv_buffer,
+                                           send_str.size()));
   EXPECT_STREQ(send_str.c_str(), recv_buffer);
 }
 

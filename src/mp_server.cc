@@ -81,8 +81,14 @@ uint16_t MPingServer::GenerateClientCookie() {
 }
 
 void MPingServer::PrintClientStats(ClientStateNode *node) const {
-  // tba
-  
+  //TODO(xunfan): log client's original IP address
+  std::cout << "total received:" << node->total_recv << 
+               ";seq received:" << node->sequence_recv << 
+               ";send back:" << node->sent_back << 
+               ";total out-of-order:" << node->out_of_order <<
+               ";total unexpected:" << node->unexpected << std::endl; 
+
+  std::cout << std::endl;  // add a blank line
 }
 
 void MPingServer::DeleteClient(uint16_t client_cookie) {
@@ -144,10 +150,7 @@ ClientStateNode *MPingServer::CheckClient(uint16_t client_cookie) {
         std::lower_bound(client_map_.begin(), client_map_.end(),
                          client_cookie, CompareClientCookie());
 
-  if (it->first == client_cookie)
-    return it->second;
-  else
-    return NULL;
+  return it->first == client_cookie ? it->second : NULL;
 }
 
 void *MPingServer::CleanupThread(void *that) {

@@ -231,7 +231,6 @@ size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
                                size_t size, int *error) const {
   char buf[size];
   size_t send_size = 0;
-  int64_t* seq_ptr;
 
   ASSERT(family_ != SOCKETFAMILY_UNSPEC);
 
@@ -262,22 +261,20 @@ size_t MpingSocket::SendPacket(const int64_t& seq, uint16_t client_cookie,
   memcpy(buf, buffer_, buffer_length_);
 
   // set cookie
-  uint16_t *cookie_ptr;
-  cookie_ptr = reinterpret_cast<uint16_t*>(buf + buffer_length_);
+  uint16_t *cookie_ptr = reinterpret_cast<uint16_t*>(buf + buffer_length_);
   *cookie_ptr = htons(client_cookie);
 
-  seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize);
+  int64_t* seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize);
   *seq_ptr = MPhton64(seq);
 
   // padding with ~seq to keep checksum constant
-  seq_ptr = reinterpret_cast<int64_t*>(buf + buffer_length_ + kCookieSize +
-                                        sizeof(int64_t));
+  seq_ptr++; 
   *seq_ptr = MPhton64(~seq);
 
   // there is 4 more bytes reserved, set it here. Now set to 0
-  uint32_t *reserved_ptr;
-  reserved_ptr = reinterpret_cast<uint32_t*>(buf + buffer_length_ + kCookieSize +
-                                        2 * sizeof(int64_t));
+  uint32_t *reserved_ptr = 
+      reinterpret_cast<uint32_t*>(buf + buffer_length_ + kCookieSize +
+                                  2 * sizeof(int64_t));
   
   *reserved_ptr = 0;
 
@@ -373,7 +370,7 @@ int64_t MpingSocket::ReceiveAndGetSeq(int* error,
       return 0;
   }
 
-  if (use_server_) {
+  if (use_server_ > 0) {
     should_recv_size = kAllHeaderLen;
     payload_offset = 0;
   }

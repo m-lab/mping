@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits.h>
 #include <string.h>
 #include <errno.h>
 
@@ -13,6 +14,18 @@ namespace {
                        think your packet will be very large (> 9000 bytes). \n\
       -V, -d  Version, Debug (verbose)\n\
       <port>           Listen port\n";
+
+long int GetIntFromStr(const char *str) {
+  long int rt = strtol(str, NULL, 10);
+  if (rt == 0)
+    LOG(FATAL, "invalide string number %s", str);
+
+  if (rt == LONG_MAX || rt == LONG_MIN)
+    LOG(FATAL, "value exceed range.");
+
+  return rt;
+}
+
 }  // namespace
 
 int main(int argc, const char** argv) {
@@ -45,7 +58,7 @@ int main(int argc, const char** argv) {
         }
       } else {
         switch (p[1]) {
-          case 'b': { packet_size = strtol(*argv, NULL, 10); argc--; break; }
+          case 'b': { packet_size = GetIntFromStr(*argv); argc--; break; }
           case '6': { server_family = SOCKETFAMILY_IPV6; argv--; break; }
           case 'V': version = true; argv--; break;
           case 'd': debug = true; argv--; break;
@@ -56,7 +69,7 @@ int main(int argc, const char** argv) {
       }
     } else {  // port
       if (!port_set) {
-        server_port = strtol(p, NULL, 10);
+        server_port = GetIntFromStr(p);
         argv--;
         port_set = true;
       }else{

@@ -3,6 +3,19 @@
 
 #include "mp_common.h"
 
+namespace {
+
+bool IsBigEndian() {
+  union {
+    uint32_t i;
+    char c[4];
+  } bint = {0x01020304};
+  
+  return bint.c[0] == 1;
+}
+
+}  // namespace
+
 const int kDefaultTTL = 255;
 
 const char *kStrHeader = "ML";
@@ -23,17 +36,32 @@ const time_t kDefaultCleanUpTime = 300;  // seconds
 //TODO(xunfan): compare client and server version to ensure compatibility
 const char *kVersion = "2.1 (2013.08)";
 
-bool IsBigEndian() {
-  int i = 1;
-  return ((char)i) == 0;
-}
-
 uint64_t MPhton64(uint64_t int_host) {
   return IsBigEndian() ? int_host : bswap_64(int_host);
 }
 
 uint64_t MPntoh64(uint64_t int_net) {
   return IsBigEndian() ? int_net : bswap_64(int_net);
+}
+
+MPTCPMessage::MPTCPMessage(MPTCPMessageCode code, ServerEchoMode type,
+                           uint16_t value) 
+    : msg_type(htons(type)),
+      msg_value(htons(value)) {
+  switch (code) {
+      case MPTCP_HELLO:
+        strncpy(msg_code, kTCPHelloMessage, 4);
+        break;
+      case MPTCP_DONE:
+        strncpy(msg_code, kTCPDoneMessage, 4);
+        break;
+      case MPTCP_CONFIRM:
+        strncpy(msg_code, kTCPConfirmMessage, 4);
+        break;
+      default:
+        LOG(FATAL, "unknow TCP code.");
+        break;
+    }
 }
 
 MPTCPMessageCode GetTCPMsgCodeFromString(const std::string& str_code) {

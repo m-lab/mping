@@ -24,7 +24,6 @@ extern const size_t kMPTCPMessageSize;
 extern const time_t kDefaultCleanUpTime;
 extern const char *kVersion;
 
-bool IsBigEndian();
 uint64_t MPhton64(uint64_t int_host);
 uint64_t MPntoh64(uint64_t int_net);
 
@@ -50,24 +49,7 @@ struct MPTCPMessage {
   uint16_t msg_type;
   uint16_t msg_value;
 
-  MPTCPMessage(MPTCPMessageCode code, ServerEchoMode type, uint16_t value) 
-    : msg_type(htons(type)),
-      msg_value(htons(value)) {
-    switch (code) {
-      case MPTCP_HELLO:
-        memcpy(msg_code, kTCPHelloMessage, 4);
-        break;
-      case MPTCP_DONE:
-        memcpy(msg_code, kTCPDoneMessage, 4);
-        break;
-      case MPTCP_CONFIRM:
-        memcpy(msg_code, kTCPConfirmMessage, 4);
-        break;
-      default:
-        LOG(FATAL, "unknow TCP code.");
-        break;
-    }
-  }
+  MPTCPMessage(MPTCPMessageCode code, ServerEchoMode type, uint16_t value);
 };
 
 MPTCPMessageCode GetTCPMsgCodeFromString(const std::string& str_code);

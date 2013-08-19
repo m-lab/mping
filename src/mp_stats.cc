@@ -193,11 +193,11 @@ void MpingStat::InsertIntervalBoundary(const struct timeval& now) {
 
 void MpingStat::PrintResearch() const {
   for (size_t i = 0; i < time_of_packets_.size(); i++) {
-    MPLOG(MPLOG_DEF, "[Research seq-time];%ld;%lu", 
+    MPLOG(MPLOG_DEF, "[Research seq-time];%" PRId64 ";%" PRId64 "", 
           seq_of_packets_.at(i), time_of_packets_.at(i));
   }
 
   for (size_t j = 0; j < interval_boundary_.size(); j++) {
-    MPLOG(MPLOG_DEF, "[Research interval-switch];%lu", interval_boundary_.at(j));
+    MPLOG(MPLOG_DEF, "[Research interval-switch];%" PRId64"", interval_boundary_.at(j));
   }
 }

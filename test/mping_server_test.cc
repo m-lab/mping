@@ -28,6 +28,20 @@ TEST(MPingServerTest, CookieTest) {
 
   mpsrv.DeleteClient(3);
   mpsrv.DeleteClient(5);
+
+  EXPECT_TRUE(mpsrv.CheckClient(1) != NULL);
+  EXPECT_TRUE(mpsrv.CheckClient(2) != NULL);
   EXPECT_TRUE(mpsrv.CheckClient(3) == NULL);
+  EXPECT_TRUE(mpsrv.CheckClient(4) != NULL);
   EXPECT_TRUE(mpsrv.CheckClient(5) == NULL);
+  for (uint16_t i = 6; i < 9; i++) {
+    EXPECT_TRUE(mpsrv.CheckClient(i) != NULL);
+  }
+
+  mpsrv.DeleteClient(1);
+  mpsrv.DeleteClient(2);
+  mpsrv.DeleteClient(4);
+  mpsrv.DeleteClient(6);
+  mpsrv.DeleteClient(7);
+  mpsrv.DeleteClient(8);
 }

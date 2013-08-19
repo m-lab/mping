@@ -15,7 +15,7 @@ TEST(MpingSocket, IPv4ICMP) {
 
 TEST(MpingSocket, IPv4ICMPwithSrc) {
   MpingSocket test2sock;
-  test2sock.Initialize("127.0.0.1", "172.17.94.151", 0, 1024, 1, 0, 0);
+  test2sock.Initialize("127.0.0.1", "127.0.0.1", 0, 1024, 1, 0, 0);
 
   int err;
   MpingStat mystat(1, false);
@@ -37,7 +37,7 @@ TEST(MpingSocket, IPv6ICMP) {
 
 TEST(MpingSocket, IPv6ICMPwithSrc) {
   MpingSocket test2sock;
-  test2sock.Initialize("::1", "2620:0:1000:3202:6e3b:e5ff:fe0b:5ca3",
+  test2sock.Initialize("::1", "::1",
                         0, 1024, 1, 0, false);
   
   int err;
@@ -60,7 +60,7 @@ TEST(MpingSocket, IPv4UDP) {
 
 TEST(MpingSocket, IPv4UDPwithSrc) {
   MpingSocket test2sock;
-  test2sock.Initialize("127.0.0.1", "172.17.94.151", 14, 1024, 1, 0, 0);
+  test2sock.Initialize("127.0.0.1", "127.0.0.1", 14, 1024, 1, 0, 0);
   
   int err;
   MpingStat mystat(1, false);
@@ -82,7 +82,7 @@ TEST(MpingSocket, IPv6UDP) {
 
 TEST(MpingSocket, IPv6UDPwithSrc) {
   MpingSocket test2sock;
-  test2sock.Initialize("::1", "2620:0:1000:3202:6e3b:e5ff:fe0b:5ca3",
+  test2sock.Initialize("::1", "::1",
                         14, 1024, 1, 0, 0);
   
   int err;

@@ -107,13 +107,12 @@ void MPingClient::Run() {
 }
 
 bool MPingClient::GoProbing(const std::string& dst_addr) {
-  size_t maxsize;
   start_burst_ = false;  // set true when win_size_ > burst size
   timedout_ = true;
   sseq_ = 0;
   mrseq_ = 0;
 
-  maxsize = std::max(pkt_size_, kMinBuffer);
+  size_t maxsize = std::max(pkt_size_, kMinBuffer);
 
   scoped_ptr<MpingSocket> mysock(new MpingSocket);
 
@@ -285,18 +284,18 @@ bool MPingClient::WindowLoop(MpingSocket *sock) {
   return true;
 }
 
-int MPingClient::GetNeedSend(int burst, bool start_burst, bool slow_start, 
+int64_t MPingClient::GetNeedSend(int burst, bool start_burst, bool slow_start, 
                              int64_t sseq, int64_t mrseq, int intran,
                              int mustsend) const{
-  int diff;
-  int need_send;
+  int64_t diff;
+  int64_t need_send;
 
   if (burst ==  0 || !start_burst) {  // no burst
-    int maxopen = slow_start?2:10;
-    diff = (int)(sseq - mrseq - intran);
+    int64_t maxopen = slow_start?2:10;
+    diff = sseq - mrseq - intran;
     need_send = (diff < 0)?std::min(maxopen, (0-diff)):mustsend;
   } else {  // start burst, now we have built the window
-    diff = (int)(sseq - mrseq + burst - intran);
+    diff = sseq - mrseq + burst - intran;
     need_send = (diff > 0)?mustsend:burst;
   }
 

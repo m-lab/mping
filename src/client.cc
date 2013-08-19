@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits.h>
 #include <string.h>
 #include <errno.h>
 
@@ -33,6 +34,17 @@ char usage[] =
 \n\
       -F <addr>   Select a source interface\n\
       <host>     Target host\n";
+
+long int GetIntFromStr(const char *str) {
+  long int rt = strtol(str, NULL, 10);
+  if (rt == 0)
+    LOG(FATAL, "invalide string number %s", str);
+
+  if (rt == LONG_MAX || rt == LONG_MIN)
+    LOG(FATAL, "value exceed range.");
+
+  return rt;
+}
 
 }  // namespace
 
@@ -77,19 +89,19 @@ int main(int argc, const char** argv) {
         }
       } else {
         switch (p[1]) {
-          case 'n': { win_size = strtol(*argv, NULL, 10); argc--; break; }
+          case 'n': { win_size = GetIntFromStr(*argv); argc--; break; }
           case 'f': { loop = true; argv--; break; }
           case 'S': { slow_start = true; argv--; break; }
-          case 't': { ttl = strtol(*argv, NULL, 10); argc--; break; }
-          case 'a': { inc_ttl = strtol(*argv, NULL, 10); 
+          case 't': { ttl = GetIntFromStr(*argv); argc--; break; }
+          case 'a': { inc_ttl = GetIntFromStr(*argv); 
                       ttl = inc_ttl; argc--; break; }
-          case 'b': { pkt_size = strtol(*argv, NULL, 10); argc--; break; }
-          case 'l': { loop_size = strtol(*argv, NULL, 10); argc--; break; }
-          case 'p': { dport = strtol(*argv, NULL, 10); argc--; break; }
-          case 'B': { burst = strtol(*argv, NULL, 10); argc--; break; }
+          case 'b': { pkt_size = GetIntFromStr(*argv); argc--; break; }
+          case 'l': { loop_size = GetIntFromStr(*argv); argc--; break; }
+          case 'p': { dport = GetIntFromStr(*argv); argc--; break; }
+          case 'B': { burst = GetIntFromStr(*argv); argc--; break; }
           case 'V': { version = true; argv--; break; }
           case 'd': { debug = true; argv--; break; }
-          case 'c': { use_server = strtol(*argv, NULL, 10); argc--; break; }
+          case 'c': { use_server = GetIntFromStr(*argv); argc--; break; }
           case 'r': { print_seq_time = true; argv--; break; }
           case 'F': { src_addr = std::string(*argv); argc--; break; }
           default: { 
