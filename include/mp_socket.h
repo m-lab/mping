@@ -23,7 +23,6 @@
 
 class MpingSocket {
   public:
-    
     MpingSocket() :
       icmp_sock(NULL),
       udp_sock(NULL),
@@ -34,14 +33,14 @@ class MpingSocket {
         memset(&srcaddr_, 0, sizeof(srcaddr_));
         memset(buffer_, 0, sizeof(buffer_));
       }
-    
+
     int Initialize(const std::string& destip, const std::string& srcip,
-                   int ttl, size_t pktsize, int wndsize, 
+                   int ttl, size_t pktsize, int wndsize,
                    uint16_t port, bool clientmode);
     ~MpingSocket();
 
     bool SetSendTTL(const int& ttl);
-    size_t SendPacket(const unsigned int& seq, size_t size, int *error) const;
+    bool SendPacket(const unsigned int& seq, size_t size, int *error) const;
     unsigned int ReceiveAndGetSeq(int* error, MpingStat *mpstat);
     const std::string GetFromAddress() const;
 
@@ -50,7 +49,7 @@ class MpingSocket {
     mlab::ClientSocket *udp_sock;
 
   private:
-    MpingSocket(const MpingSocket& other); 
+    MpingSocket(const MpingSocket& other);
     MpingSocket& operator = (const MpingSocket&);
 
     SocketFamily family_;

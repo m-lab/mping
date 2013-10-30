@@ -12,14 +12,15 @@
 #include "mp_stats.h"
 #include "log.h"
 #include "scoped_ptr.h"
-#include "mlab/socket_family.h"
+#include "mlab/accepted_socket.h"
 #include "mlab/host.h"
+#include "mlab/listen_socket.h"
 #include "mlab/mlab.h"
 #include "mlab/protocol_header.h"
-#include "mlab/server_socket.h"
+#include "mlab/socket_family.h"
 
 namespace {
-  char usage[] = 
+  char usage[] =
 "Usage:  mping [<switch> [<val>]]* <host>\n\
       -n <num>    Number of messages to keep in transit\n\
       -f          Loop forever (Don't increment # messages in transit)\n\
@@ -134,9 +135,10 @@ void MPing::RunServer() {
   LOG(mlab::INFO, "Running server mode, port %u.", server_port);
 
   // create server socket
-  scoped_ptr<mlab::ServerSocket> 
-      mysock(mlab::ServerSocket::CreateOrDie(server_port, SOCKETTYPE_UDP, 
-                                             server_family));
+  scoped_ptr<mlab::ListenSocket> mylistensock(mlab::ListenSocket::CreateOrDie(
+      server_port, SOCKETTYPE_UDP, server_family));
+
+  scoped_ptr<mlab::AcceptedSocket> mysock(mylistensock->Accept());
 
   // check socket buffer size
   if (mysock->GetRecvBufferSize() < packet_size) {
@@ -153,13 +155,14 @@ void MPing::RunServer() {
   // default time out is 5 sec, use it
   while (1) {
     errno = 0;
-    mlab::Packet recv_packet = mysock->ReceiveWithError(packet_size);
-    if (errno != 0) {
+    ssize_t recv_bytes = 0;
+    mlab::Packet recv_packet = mysock->Receive(packet_size, &recv_bytes);
+    if (recv_bytes < 0) {
       if (errno == EAGAIN) {
         if (have_data) {
           // print stats
           std::cout << "Total received=" << total_recv << " seq received=" <<
-                       seq_recv << " send back=" << sent_back << 
+                       seq_recv << " send back=" << sent_back <<
                        " total out-of-order=" << out_of_order <<
                        " total unexpected=" << unexpected << std::endl;
           have_data = false;
@@ -188,7 +191,7 @@ void MPing::RunServer() {
 
     have_data = true;
     seq_recv++;
-    const unsigned int *seq = 
+    const unsigned int *seq =
         reinterpret_cast<const unsigned int*>(recv_packet.buffer() +
                                               PayloadHeaderLength);
 
@@ -199,7 +202,7 @@ void MPing::RunServer() {
       mrseq = rseq;
     }
 
-    mysock->Send(recv_packet);
+    mysock->Send(recv_packet, NULL);
     sent_back++;
   }
 }
@@ -220,8 +223,8 @@ int MPing::GoProbing(const std::string& dst_addr) {
 
   scoped_ptr<MpingSocket> mysock(new MpingSocket);
 
-  if (mysock->Initialize(dst_addr, src_addr, ttl, 
-                         maxsize, win_size, dport, client_mode) < 0) {
+  if (mysock->Initialize(
+          dst_addr, src_addr, ttl, maxsize, win_size, dport, client_mode) < 0) {
     return -1;
   }
 
@@ -242,16 +245,16 @@ int MPing::GoProbing(const std::string& dst_addr) {
     // second loop: buffer size
     int nbix = 0;
     for (nbix = 0; ; nbix++) {
-      if (haltf) 
+      if (haltf)
         break;
 
       if (pkt_size > 0) {  // set packet size: use static packet size
         packet_size = pkt_size;
-        if (nbix != 0) 
+        if (nbix != 0)
           break;
       } else {  // set packet size: increase packet size
         if (loop_size == -1) {
-          if (kNbTab[nbix] == 0) 
+          if (kNbTab[nbix] == 0)
             break;
 
           packet_size = kNbTab[nbix];
@@ -311,7 +314,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
             LOG(mlab::INFO, "ttl %d, packet size %lu, window size %d",
                 tempttl, packet_size, intran);
           } else {
-            LOG(mlab::INFO, "packet size %lu, window size %d", 
+            LOG(mlab::INFO, "packet size %lu, window size %d",
                 packet_size, intran);
           }
         }
@@ -328,16 +331,15 @@ int MPing::GoProbing(const std::string& dst_addr) {
         }
 
         alarm(2);  // reset each time called, recv timeout if recv block
-        
+
         // fourth loop: with in 1 sec
         tick++;
 
 #ifdef MP_PRINT_TIMELINE
         int out = 0;  // for debug
-#endif        
+#endif
         while (tick >= now.tv_sec) {
           int maxopen;
-          int rt;
           unsigned int rseq;
           int err;
           bool timeout = false;
@@ -357,10 +359,10 @@ int MPing::GoProbing(const std::string& dst_addr) {
 
           while (need_send > 0) {
             sseq++;
-            rt = mysock->SendPacket(sseq, packet_size, &err);
+            bool success = mysock->SendPacket(sseq, packet_size, &err);
 
-            if (rt < 0) {  // send fails
-              if (err != EINTR) { 
+            if (!success) {  // send fails
+              if (err != EINTR) {
                 if (err == ENOBUFS) {
                   LOG(mlab::INFO, "send buffer run out.");
                   maxopen = 0;
@@ -380,11 +382,11 @@ int MPing::GoProbing(const std::string& dst_addr) {
             } else {  // send success, update counters
               gettimeofday(&now, 0);
               mystat->EnqueueSend(sseq, now);
-#ifdef MP_PRINT_TIMELINE              
+#ifdef MP_PRINT_TIMELINE
               out++;
-#endif              
-              
-              if (burst > 0 && intran >= burst && 
+#endif
+
+              if (burst > 0 && intran >= burst &&
                   !start_burst && (sseq-mrseq-intran) == 0) {
                 // let the on-flight reach window size, then start burst
                 LOG(mlab::INFO, "start burst, window %d, burst %d",
@@ -399,7 +401,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
             LOG(mlab::INFO, "send being interrupted.");
             break;  // almost never happen
           }
-          
+
           // recv
           rseq = mysock->ReceiveAndGetSeq(&err, mystat.get());
           if (err != 0) {
@@ -447,18 +449,18 @@ int MPing::GoProbing(const std::string& dst_addr) {
   return 0;
 }
 
-MPing::MPing(const int& argc, const char **argv) :
-      win_size(4),                                                              
-      loop(false),                                                              
-      rate(0),                                                                  
-      slow_start(false),                                                        
-      ttl(0),                                                                   
-      inc_ttl(0),                                                               
-      pkt_size(0),                                                              
-      loop_size(0),                                                             
-      version(false),                                                           
-      debug(false),                                                             
-      burst(0),                                                                 
+MPing::MPing(const int& argc, const char** argv)
+    : win_size(4),
+      loop(false),
+      rate(0),
+      slow_start(false),
+      ttl(0),
+      inc_ttl(0),
+      pkt_size(0),
+      loop_size(0),
+      version(false),
+      debug(false),
+      burst(0),
       interval(0),
       dport(0),
       server_port(0),
@@ -503,13 +505,13 @@ MPing::MPing(const int& argc, const char **argv) :
           case 'b': {
             p = *av;
             if (p[0] == '-') {
-              loop_size = atoi(*av);  
+              loop_size = atoi(*av);
             } else {
               pkt_size = atoi(*av);
             }
 
             ac--;
-            break; 
+            break;
           }
           case 'p': { dport = atoi(*av); ac--; break; }
           case 'B': { burst = atoi(*av); ac--; break; }
@@ -519,14 +521,14 @@ MPing::MPing(const int& argc, const char **argv) :
           case '4': { server_family = SOCKETFAMILY_IPV4; av--; break; }
           case '6': { server_family = SOCKETFAMILY_IPV6; av--; break; }
           case 'F': { src_addr = std::string(*av); ac--; break; }
-          default: { 
-            LOG(mlab::FATAL, "Unknown parameter -%c\n%s", p[1], usage); break; 
+          default: {
+            LOG(mlab::FATAL, "Unknown parameter -%c\n%s", p[1], usage); break;
           }
         }
       }
     } else {  // host
       if (!host_set) {
-        dst_host = std::string(p);  
+        dst_host = std::string(p);
         av--;
         host_set = 1;
       }else{
@@ -559,7 +561,7 @@ void MPing::ValidatePara() {
     if (server_port > 65535) {
       LOG(mlab::FATAL, "Server port cannot larger than 65535.");
     }
-    
+
     if (server_family == SOCKETFAMILY_UNSPEC){
       LOG(mlab::FATAL, "Need to know the socket family, use -4 or -6.");
     }
@@ -586,13 +588,13 @@ void MPing::ValidatePara() {
       ttl = kDefaultTTL;
     }
   }
-  
+
   // TTL
   if (ttl > 255 || ttl < 0) {
     ttl = 255;
-    LOG(mlab::WARNING, "TTL %d is either > 255 or < 0, " 
+    LOG(mlab::WARNING, "TTL %d is either > 255 or < 0, "
                        "now set TTL to 255.", ttl);
-  } 
+  }
 
   // loop_size [-4, -1]
   if (loop_size < -4 || loop_size > 0) {
@@ -622,11 +624,11 @@ void MPing::ValidatePara() {
 
   // validate local host
   if (src_addr.length() > 0) {
-    if (mlab::RawSocket::GetAddrFamily(src_addr) == SOCKETFAMILY_UNSPEC) {
+    if (mlab::GetSocketFamilyForAddress(src_addr) == SOCKETFAMILY_UNSPEC) {
       LOG(mlab::FATAL, "Local host %s invalid. Only accept numeric IP address",
           src_addr.c_str());
     }
-  } 
+  }
 
   // validate UDP destination port
   if (dport > 0 ) {
