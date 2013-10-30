@@ -213,7 +213,6 @@ bool MPing::IsServerMode() const {
 
 int MPing::GoProbing(const std::string& dst_addr) {
   size_t maxsize;
-  size_t packet_size;  // current packet size, include IP header length
   unsigned int sseq = 0;  // send sequence
   unsigned int mrseq = 0;  // recv sequence
   bool start_burst = false;  // set true when win_size > burst size
@@ -248,6 +247,8 @@ int MPing::GoProbing(const std::string& dst_addr) {
       if (haltf)
         break;
 
+      // current packet size, include IP header length
+      size_t packet_size = 0;
       if (pkt_size > 0) {  // set packet size: use static packet size
         packet_size = pkt_size;
         if (nbix != 0)
@@ -286,7 +287,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
       // 0 is to collect all trailing messages still in transit
       uint16_t intran;  // current window size
       for (intran = loop?win_size:1; intran; intran?intran++:0) {
-        int mustsend;
+        int mustsend = 0;
         struct timeval now;
 
         if (haltf)
@@ -343,7 +344,7 @@ int MPing::GoProbing(const std::string& dst_addr) {
           unsigned int rseq;
           int err;
           bool timeout = false;
-          int diff, need_send;
+          int diff, need_send = 0;
 
           // send
           if (burst ==  0 || !start_burst) {  // no burst
@@ -491,7 +492,8 @@ MPing::MPing(const int& argc, const char** argv)
           case 'c': client_mode = true; av--; break;
           case '4': server_family = SOCKETFAMILY_IPV4; av--; break;
           case '6': server_family = SOCKETFAMILY_IPV6; av--; break;
-          default: LOG(mlab::FATAL, "\n%s", usage); break;
+          case 'h':  // fall through
+          default: std::cout << usage << std::endl; exit(0); break;
         }
       } else {
         switch (p[1]) {

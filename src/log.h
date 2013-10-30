@@ -37,7 +37,7 @@ const char* GetSeverityTag(mlab::LogSeverity s);
       fprintf(fd, format, ##__VA_ARGS__); \
       fprintf(fd, "\n"); \
       fflush(fd); \
-      ASSERT(severity != mlab::FATAL); \
+      if (severity == mlab::FATAL) exit(1); \
     } \
   }
 

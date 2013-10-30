@@ -169,7 +169,7 @@ int MpingSocket::Initialize(const std::string& destip, const std::string& srcip,
     // bind UDP socket to a src ip with port 0 (kernel will choose random port)
     if (srcip.length() != 0) {
       sockaddr_storage sa, da;
-      socklen_t size;
+      socklen_t size = 0;
       switch (srcaddr_.ss_family) {
         case AF_INET: {
           sockaddr_in *in = reinterpret_cast<sockaddr_in*>(&da);
