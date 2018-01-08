@@ -7,17 +7,22 @@ The Internet is suffering from multiple effects of its own rapid growth. Network
 
 git
 ===
+
+```
 $ git pull
 $ git submodule update --init --recursive
+```
 
 Make
 =====
+```
 $ cmake .
 $ make
+```
 
 Test sending and receiving 
 =====
-1. Un-comment include/mp_mping.h "#define MP_PRINT_TIMELINE"
+1. Un-comment include/mp_mping.h `#define MP_PRINT_TIMELINE`
 2. make
 The program will print out sending and receiving sequence at the end.
 Note that under this mode, in every second, the program will only send 50 packets.
